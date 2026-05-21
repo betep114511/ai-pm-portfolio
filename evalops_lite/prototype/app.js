@@ -71,6 +71,8 @@
     gateList: document.getElementById("gateList"),
     failureList: document.getElementById("failureList"),
     caseTable: document.getElementById("caseTable"),
+    streamSummary: document.getElementById("streamSummary"),
+    streamStatus: document.getElementById("streamStatus"),
   };
 
   const form = {
@@ -265,6 +267,40 @@
     };
   }
 
+  async function readSSE(response, handlers) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let event = "message";
+        let data = "";
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).replace(/^\s/, "");
+        }
+        let parsed;
+        try { parsed = JSON.parse(data); } catch { parsed = { raw: data }; }
+        const h = handlers[event];
+        if (h) h(parsed);
+      }
+    }
+  }
+
+  function resetForStream() {
+    if (els.streamSummary) {
+      els.streamSummary.textContent = "";
+      els.streamSummary.classList.add("streaming");
+    }
+    if (els.streamStatus) els.streamStatus.textContent = "AI 正在书写评估摘要…";
+  }
+
   async function run() {
     if (!pool.length) {
       els.gateStatus.textContent = "请先添加 case";
@@ -275,26 +311,60 @@
     els.gateStatus.textContent = "运行中…";
     els.gateStatus.className = "gate warn";
     const started = performance.now();
+
+    if (backendReady) resetForStream();
+
     try {
       if (!backendReady) throw new Error("offline");
-      const r = await fetch(`${AI_BACKEND_URL}/api/evalops/judge`, {
+      const r = await fetch(`${AI_BACKEND_URL}/api/evalops/judge/stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
         body: JSON.stringify({ cases: pool }),
       });
-      if (!r.ok) throw new Error(`backend ${r.status}`);
-      const data = await r.json();
+      if (!r.ok || !r.body) throw new Error(`backend ${r.status}`);
+
+      let summaryAccum = "";
+      let finalResult = null;
+      let streamError = null;
+      await readSSE(r, {
+        body_delta: (d) => {
+          summaryAccum += d.text || "";
+          if (els.streamSummary) els.streamSummary.textContent = summaryAccum;
+        },
+        result: (d) => {
+          if (d && typeof d.raw === "string") {
+            try { finalResult = { ...JSON.parse(d.raw), _meta: d._meta }; return; } catch (_) {}
+          }
+          finalResult = d;
+        },
+        error: (d) => { streamError = d; },
+      });
+
+      if (els.streamSummary) els.streamSummary.classList.remove("streaming");
+      if (streamError) throw new Error(streamError.detail || "stream error");
+      if (!finalResult) throw new Error("no result event");
+
       const elapsed = (performance.now() - started) / 1000;
       els.rtLatency.innerHTML = `<strong>${elapsed.toFixed(1)}s</strong>`;
-      if (data._meta && data._meta.model) {
-        els.rtModel.innerHTML = `<strong>${data._meta.model}</strong>`;
+      if (finalResult._meta && finalResult._meta.model) {
+        els.rtModel.innerHTML = `<strong>${finalResult._meta.model}</strong>`;
       }
-      if (!data.summary) data.summary = {};
-      if (!data.summary.latency) data.summary.latency = `${elapsed.toFixed(1)}s`;
-      renderResult(data, "ai");
+      if (!finalResult.summary) finalResult.summary = {};
+      if (!finalResult.summary.latency) finalResult.summary.latency = `${elapsed.toFixed(1)}s`;
+      if (els.streamSummary && (summaryAccum || finalResult.summary_text)) {
+        els.streamSummary.textContent = summaryAccum || finalResult.summary_text || "";
+      }
+      if (els.streamStatus) els.streamStatus.textContent = "已使用实时 LLM 流式生成";
+      renderResult(finalResult, "ai");
     } catch (e) {
+      if (els.streamSummary) els.streamSummary.classList.remove("streaming");
+      if (els.streamStatus) els.streamStatus.textContent = "未启用 AI · 使用兜底数据";
       const elapsed = (performance.now() - started) / 1000;
       els.rtLatency.innerHTML = `<strong>${elapsed.toFixed(1)}s</strong>`;
+      if (els.streamSummary) {
+        els.streamSummary.textContent =
+          "本地未启用 LLM，已展示兜底数据。启动 ./scripts/run_ai_backend.sh 后，AI 会先用 2-4 句话总结这批 case 的整体表现，并在下方填好门禁、失败归因和每条 case 详情。";
+      }
       renderResult(mockResult(pool), "mock");
     } finally {
       els.runButton.disabled = false;

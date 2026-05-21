@@ -149,6 +149,45 @@
     }
   }
 
+  async function readSSE(response, handlers) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let event = "message";
+        let data = "";
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).replace(/^\s/, "");
+        }
+        let parsed;
+        try { parsed = JSON.parse(data); } catch { parsed = { raw: data }; }
+        const h = handlers[event];
+        if (h) h(parsed);
+      }
+    }
+  }
+
+  function resetAnswerPanel() {
+    els.answerTitle.textContent = "AI 生成中…";
+    els.answerBody.textContent = "";
+    els.answerBody.classList.add("streaming");
+    els.safetyBody.textContent = "等待 AI 生成…";
+    els.riskBadge.className = "risk-badge medium";
+    els.riskBadge.textContent = "生成中";
+    els.confidenceValue.textContent = "—";
+    els.confidenceFill.style.width = "0%";
+    els.retrievalMeta.textContent = "—";
+    els.citationList.innerHTML = '<div class="citation"><strong>等待 AI 生成…</strong><p>引用条目会在答案生成完成后弹出。</p></div>';
+  }
+
   async function ask() {
     const question = els.questionInput.value.trim();
     const knowledge = els.knowledgeInput.value.trim();
@@ -157,26 +196,60 @@
       return;
     }
     setLoading(true);
-    els.feedbackStatus.textContent = backendReady ? "正在调用实时 LLM…" : "本地后端离线，使用兜底回答。";
+    els.feedbackStatus.textContent = backendReady ? "正在调用实时 LLM（流式）…" : "本地后端离线，使用兜底回答。";
     const started = performance.now();
+
+    if (backendReady) resetAnswerPanel();
+
     try {
       if (!backendReady) throw new Error("offline");
-      const r = await fetch(`${AI_BACKEND_URL}/api/chemdoc/ask`, {
+      const r = await fetch(`${AI_BACKEND_URL}/api/chemdoc/ask/stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
         body: JSON.stringify({ question, knowledge, context: "User-supplied snippets only. Cite each fact." }),
       });
-      if (!r.ok) throw new Error(`backend ${r.status}`);
-      const data = await r.json();
+      if (!r.ok || !r.body) throw new Error(`backend ${r.status}`);
+
+      let bodyAccum = "";
+      let finalResult = null;
+      let streamError = null;
+      await readSSE(r, {
+        body_delta: (d) => {
+          bodyAccum += d.text || "";
+          els.answerBody.textContent = bodyAccum;
+          if (els.answerTitle.textContent === "AI 生成中…") {
+            els.answerTitle.textContent = "AI 正在书写引用回答…";
+          }
+        },
+        result: (d) => {
+          if (d && typeof d.raw === "string") {
+            try { finalResult = { ...JSON.parse(d.raw), _meta: d._meta }; return; } catch (_) {}
+          }
+          finalResult = d;
+        },
+        error: (d) => { streamError = d; },
+      });
+
+      els.answerBody.classList.remove("streaming");
+      if (streamError) throw new Error(streamError.detail || "stream error");
+      if (!finalResult) throw new Error("no result event");
+
       const elapsed = (performance.now() - started) / 1000;
       els.rtLatency.innerHTML = `<strong>${elapsed.toFixed(1)}s</strong>`;
-      if (data._meta && data._meta.model) {
-        els.rtModel.innerHTML = `<strong>${data._meta.model}</strong>`;
+      if (finalResult._meta && finalResult._meta.model) {
+        els.rtModel.innerHTML = `<strong>${finalResult._meta.model}</strong>`;
       }
       const fallback = fallbackAnswer(question, knowledge);
-      renderAnswer({ ...fallback, ...data, citations: Array.isArray(data.citations) ? data.citations : fallback.citations }, "ai");
-      els.feedbackStatus.textContent = "已使用实时 LLM 生成。";
+      const merged = {
+        ...fallback,
+        ...finalResult,
+        body: bodyAccum || finalResult.body || fallback.body,
+        citations: Array.isArray(finalResult.citations) ? finalResult.citations : fallback.citations,
+      };
+      renderAnswer(merged, "ai");
+      els.feedbackStatus.textContent = "已使用实时 LLM 流式生成。";
     } catch (e) {
+      els.answerBody.classList.remove("streaming");
       const elapsed = (performance.now() - started) / 1000;
       els.rtLatency.innerHTML = `<strong>${elapsed.toFixed(1)}s</strong>`;
       renderAnswer(fallbackAnswer(question, knowledge), "mock");
