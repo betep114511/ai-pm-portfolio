@@ -21,6 +21,7 @@ const questions = [
 
 const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
 let index = 0;
+const navButtons = Array.from(document.querySelectorAll("aside nav button"));
 const messages = document.querySelector("#messages");
 const answerInput = document.querySelector("#answerInput");
 const feedbackText = document.querySelector("#feedbackText");
@@ -50,6 +51,18 @@ async function postWithTimeout(url, payload, timeoutMs = 30000) {
   }
 }
 
+function showToast(message) {
+  const existing = document.querySelector(".demo-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "demo-toast";
+  toast.textContent = message;
+  toast.setAttribute("role", "status");
+  toast.style.cssText = "position:fixed;right:18px;bottom:18px;z-index:20;max-width:320px;padding:12px 14px;border-radius:8px;background:#251d35;color:#fff;box-shadow:0 14px 36px rgba(0,0,0,.18);font-size:14px;line-height:1.45;";
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 2600);
+}
+
 function addMessage(type, text) {
   const node = document.createElement("div");
   node.className = `msg ${type}`;
@@ -73,6 +86,22 @@ async function coachWithLocalAI(answer) {
       stage: "mock_interview"
   });
 }
+
+navButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    navButtons.forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    const label = button.textContent.trim();
+    const notes = {
+      模拟面试: questions[index].feedback,
+      题库: "题库已切换：当前包含项目深挖、RAG/Eval/Agent、指标体系和风险兜底 4 类题。",
+      评分报告: "评分报告已切换：重点看产品结构、AI 理解、指标意识和风险意识四项能力。",
+      训练计划: "训练计划已切换：建议先练 2 分钟项目讲述，再补充评测指标和失败兜底案例。"
+    };
+    feedbackText.textContent = notes[label] || `已切换到 ${label}`;
+    showToast(`已切换到 ${label}`);
+  });
+});
 
 document.querySelector("#submitButton").addEventListener("click", async () => {
   const answer = answerInput.value.trim();
