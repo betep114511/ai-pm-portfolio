@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SafetyLens Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">S</div>
+          <div>
+            <strong>SafetyLens</strong>
+            <span>SDS 安全审核</span>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="active" type="button">审核工作台</button>
+          <button type="button">化学品库</button>
+          <button type="button">规则库</button>
+          <button type="button">审计记录</button>
+        </nav>
+        <section class="upload-panel">
+          <div class="label">当前批次</div>
+          <h2>新入库化学品审核</h2>
+          <p>12 份 SDS · 4 项高风险待确认</p>
+          <button type="button">上传 SDS</button>
+        </section>
+        <section class="chem-list">
+          <div class="label">样例 SDS</div>
+          <button class="chem active" type="button" data-chemical="ether"><span class="risk high">高</span>乙醚</button>
+          <button class="chem" type="button" data-chemical="acid"><span class="risk high">高</span>浓硫酸</button>
+          <button class="chem" type="button" data-chemical="dmf"><span class="risk medium">中</span>DMF</button>
+          <button class="chem" type="button" data-chemical="nah"><span class="risk high">高</span>氢化钠</button>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="chemicalName">乙醚 SDS 审核</h1>
+            <p id="chemicalMeta">CAS 60-29-7 · 高度易燃 · 待 EHS 确认</p>
+          </div>
+          <div class="actions">
+            <button class="secondary" type="button">导出清单</button>
+            <button id="approveButton" class="primary" type="button">确认高风险项</button>
+          </div>
+        </header>
+
+        <section class="status-strip">
+          <div>
+            <span>字段抽取</span>
+            <strong id="extractScore">94%</strong>
+          </div>
+          <div>
+            <span>高风险召回</span>
+            <strong>100%</strong>
+          </div>
+          <div>
+            <span>规则冲突</span>
+            <strong id="conflictCount">2</strong>
+          </div>
+          <div>
+            <span>审核状态</span>
+            <strong id="reviewStatus">待确认</strong>
+          </div>
+        </section>
+
+        <section class="grid">
+          <article class="card document-card">
+            <div class="card-head">
+              <h2>SDS 片段</h2>
+              <span id="docSource">Section 2 / Section 7</span>
+            </div>
+            <p id="sdsText">Highly flammable liquid and vapor. Keep away from heat, sparks, open flames. Store in a well-ventilated place. Incompatible with oxidizing agents.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h2>AI 抽取字段</h2>
+              <span>LLM Draft</span>
+            </div>
+            <div id="fieldList" class="field-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h2>规则校验</h2>
+              <span>Rule Engine</span>
+            </div>
+            <div id="ruleList" class="rule-list"></div>
+          </article>
+
+          <article class="card checklist-card">
+            <div class="card-head">
+              <h2>安全清单</h2>
+              <span>Checklist</span>
+            </div>
+            <ul id="checklist"></ul>
+          </article>
+        </section>
+
+        <section class="audit card">
+          <div class="card-head">
+            <h2>审计留痕</h2>
+            <span>AI 输出和人工修改均保留</span>
+          </div>
+          <div id="auditLog" class="timeline"></div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

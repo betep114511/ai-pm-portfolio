@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InterviewMate AI Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">I</div>
+          <div>
+            <strong>InterviewMate AI</strong>
+            <span>AI PM 面试陪练</span>
+          </div>
+        </div>
+        <section class="jd-card">
+          <span>目标岗位</span>
+          <h2>AI 产品经理 · LLM 应用</h2>
+          <p>关键词：RAG、Prompt、Eval、Agent、指标体系</p>
+        </section>
+        <nav>
+          <button class="active" type="button">模拟面试</button>
+          <button type="button">题库</button>
+          <button type="button">评分报告</button>
+          <button type="button">训练计划</button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header>
+          <div>
+            <h1>多轮追问模拟</h1>
+            <p>根据目标 JD 和用户回答，持续追问产品闭环、AI 理解和指标意识。</p>
+          </div>
+          <button id="nextButton" type="button">下一题</button>
+        </header>
+
+        <section class="layout">
+          <article class="chat panel">
+            <div id="messages" class="messages"></div>
+            <div class="answer-box">
+              <textarea id="answerInput" rows="4">我做过 ChemDoc AI，面向化学实验室新人，解决论文、SOP 和 SDS 查询低效的问题。核心方案是 RAG 知识库问答，回答必须附引用来源，并对高风险问题触发安全提示。</textarea>
+              <button id="submitButton" type="button">提交回答</button>
+            </div>
+          </article>
+
+          <aside class="panel report">
+            <h2>实时评分</h2>
+            <div class="score"><span>产品结构</span><strong id="scoreProduct">82</strong></div>
+            <div class="score"><span>AI 理解</span><strong id="scoreAI">78</strong></div>
+            <div class="score"><span>指标意识</span><strong id="scoreMetric">74</strong></div>
+            <div class="score"><span>风险意识</span><strong id="scoreRisk">86</strong></div>
+            <div class="feedback">
+              <h3>改进建议</h3>
+              <p id="feedbackText">回答已经讲清楚用户和方案，建议补充北极星指标、幻觉率、引用命中率和上线门禁。</p>
+            </div>
+            <div class="plan">
+              <h3>今日训练</h3>
+              <ul>
+                <li>用 2 分钟讲完 ChemDoc AI。</li>
+                <li>补充 3 个 AI 质量指标。</li>
+                <li>准备“模型答错怎么办”的追问。</li>
+              </ul>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

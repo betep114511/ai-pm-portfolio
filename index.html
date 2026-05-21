@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI PM Portfolio</title>
+    <style>
+      :root {
+        --ink: #18232d;
+        --muted: #63717d;
+        --line: #dce4ea;
+        --bg: #f4f7f7;
+        --panel: #ffffff;
+        --teal: #147d7a;
+        --blue: #2857a4;
+        --green: #247a4a;
+        --violet: #6851a8;
+        --amber: #ad6500;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--bg);
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+        letter-spacing: 0;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .hero {
+        min-height: 58vh;
+        display: grid;
+        align-items: end;
+        padding: 48px;
+        color: #ffffff;
+        background:
+          linear-gradient(180deg, rgba(9, 26, 31, 0.12), rgba(9, 26, 31, 0.9)),
+          radial-gradient(circle at 18% 25%, rgba(20, 125, 122, 0.86), transparent 24%),
+          radial-gradient(circle at 82% 18%, rgba(40, 87, 164, 0.78), transparent 22%),
+          radial-gradient(circle at 64% 82%, rgba(104, 81, 168, 0.72), transparent 24%),
+          linear-gradient(135deg, #1f3338, #1b2634 48%, #2d2b3c);
+      }
+
+      .hero-inner {
+        width: min(1120px, 100%);
+      }
+
+      .badge {
+        display: inline-flex;
+        min-height: 32px;
+        align-items: center;
+        border-radius: 8px;
+        padding: 0 10px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.13);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        margin-top: 18px;
+        font-size: 54px;
+        line-height: 1.06;
+      }
+
+      .lead {
+        max-width: 780px;
+        margin-top: 16px;
+        color: rgba(255, 255, 255, 0.84);
+        font-size: 18px;
+        line-height: 1.78;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .button {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        padding: 0 16px;
+        text-decoration: none;
+        font-weight: 800;
+      }
+
+      .button.primary {
+        background: #37c6b7;
+        color: #061414;
+      }
+
+      .button.secondary {
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.26);
+        color: #ffffff;
+      }
+
+      .content {
+        width: min(1160px, calc(100% - 40px));
+        margin: -30px auto 60px;
+        display: grid;
+        gap: 20px;
+      }
+
+      .summary-grid,
+      .project-grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .project-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card,
+      .section-panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 18px 45px rgba(31, 45, 61, 0.08);
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .card strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 21px;
+      }
+
+      .card p {
+        margin-top: 8px;
+        color: var(--muted);
+        line-height: 1.62;
+      }
+
+      .section-panel {
+        padding: 24px;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+
+      .section-head h2 {
+        font-size: 25px;
+      }
+
+      .section-head p {
+        max-width: 620px;
+        color: var(--muted);
+        line-height: 1.62;
+      }
+
+      .project {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .project h3 {
+        font-size: 21px;
+      }
+
+      .project p {
+        color: var(--muted);
+        line-height: 1.68;
+      }
+
+      .project-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .pill {
+        min-height: 28px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 7px;
+        padding: 0 8px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .pill.teal { color: var(--teal); background: #e5f4f2; }
+      .pill.green { color: var(--green); background: #e5f3eb; }
+      .pill.blue { color: var(--blue); background: #e8eefb; }
+      .pill.violet { color: var(--violet); background: #eee9fb; }
+
+      .link-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .mini-link {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        padding: 0 11px;
+        text-decoration: none;
+        font-weight: 780;
+      }
+
+      .mini-link:hover {
+        border-color: #8cadf0;
+        background: #f2f6ff;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 12px;
+      }
+
+      .timeline-row {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr);
+        gap: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .timeline-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .timeline-row strong {
+        color: var(--teal);
+      }
+
+      .timeline-row p {
+        color: var(--muted);
+        line-height: 1.62;
+      }
+
+      @media (max-width: 900px) {
+        .hero {
+          padding: 34px 20px;
+        }
+
+        h1 {
+          font-size: 38px;
+        }
+
+        .summary-grid,
+        .project-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .section-head {
+          display: grid;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .timeline-row {
+          grid-template-columns: 1fr;
+        }
+
+        .project-top {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div class="hero-inner">
+          <div class="badge">AI 产品经理作品集 · 化学背景 · LLM/RAG/Eval/Agent</div>
+          <h1>把专业知识场景，拆成可评测、可上线的 AI 产品。</h1>
+          <p class="lead">
+            这是一组面向 AI 产品经理岗位的个人作品集项目，覆盖垂直知识库问答、危化品安全审核、LLM 评测平台和面试陪练 Agent。重点展示用户需求、产品流程、AI 质量指标、风险边界和迭代闭环。
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#projects">查看项目</a>
+            <a class="button secondary" href="./portfolio_presentation_guide.md">展示指南</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="content">
+        <div class="summary-grid" aria-label="能力矩阵">
+          <article class="card">
+            <div class="label">Domain</div>
+            <strong>垂直场景理解</strong>
+            <p>从化学文献、SOP、SDS 和实验安全切入，把专业背景转化成 AI 产品优势。</p>
+          </article>
+          <article class="card">
+            <div class="label">AI Product</div>
+            <strong>RAG / Agent / 人机协同</strong>
+            <p>不只做聊天框，而是设计引用、拒答、规则校验、人工审核和任务流程。</p>
+          </article>
+          <article class="card">
+            <div class="label">Evaluation</div>
+            <strong>评测与上线门禁</strong>
+            <p>用测试集、幻觉率、引用命中率、拒答正确率和高风险漏报率判断能否上线。</p>
+          </article>
+        </div>
+
+        <section id="projects" class="section-panel">
+          <div class="section-head">
+            <div>
+              <div class="label">Projects</div>
+              <h2>项目矩阵</h2>
+            </div>
+            <p>建议简历主放 ChemDoc AI、SafetyLens、EvalOps Lite；InterviewMate AI 作为 Agent 加分项。</p>
+          </div>
+
+          <div class="project-grid">
+            <article class="project">
+              <div class="project-top">
+                <div>
+                  <h3>ChemDoc AI</h3>
+                  <p>化学文献与实验 SOP 智能问答助手，强调 RAG、引用来源、拒答和安全提示。</p>
+                </div>
+                <span class="pill teal">RAG</span>
+              </div>
+              <div class="link-row">
+                <a class="mini-link" href="./chemdoc_ai/prototype/">打开原型</a>
+                <a class="mini-link" href="./chemdoc_ai/case_study.md">Case Study</a>
+                <a class="mini-link" href="./chemdoc_ai/metrics_and_eval.md">指标评测</a>
+              </div>
+            </article>
+
+            <article class="project">
+              <div class="project-top">
+                <div>
+                  <h3>SafetyLens</h3>
+                  <p>危化品 SDS 安全合规审核助手，强调 LLM 抽取、规则校验、人工审核和审计留痕。</p>
+                </div>
+                <span class="pill green">Safety</span>
+              </div>
+              <div class="link-row">
+                <a class="mini-link" href="./safetylens/prototype/">打开原型</a>
+                <a class="mini-link" href="./safetylens/case_study.md">Case Study</a>
+                <a class="mini-link" href="./safetylens/metrics_and_eval.md">指标评测</a>
+              </div>
+            </article>
+
+            <article class="project">
+              <div class="project-top">
+                <div>
+                  <h3>EvalOps Lite</h3>
+                  <p>LLM 应用质量评估与迭代看板，强调 Prompt/模型对比、上线门禁和失败回流。</p>
+                </div>
+                <span class="pill blue">Eval</span>
+              </div>
+              <div class="link-row">
+                <a class="mini-link" href="./evalops_lite/prototype/">打开原型</a>
+                <a class="mini-link" href="./evalops_lite/case_study.md">Case Study</a>
+                <a class="mini-link" href="./evalops_lite/metrics_and_eval.md">指标评测</a>
+              </div>
+            </article>
+
+            <article class="project">
+              <div class="project-top">
+                <div>
+                  <h3>InterviewMate AI</h3>
+                  <p>AI 产品经理面试陪练 Agent，强调 JD 解析、多轮追问、评分 Rubric 和训练计划。</p>
+                </div>
+                <span class="pill violet">Agent</span>
+              </div>
+              <div class="link-row">
+                <a class="mini-link" href="./interviewmate_ai/prototype/">打开原型</a>
+                <a class="mini-link" href="./interviewmate_ai/case_study.md">Case Study</a>
+                <a class="mini-link" href="./interviewmate_ai/metrics_and_eval.md">指标评测</a>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="section-panel">
+          <div class="section-head">
+            <div>
+              <div class="label">Narrative</div>
+              <h2>面试展示主线</h2>
+            </div>
+          </div>
+          <div class="timeline">
+            <div class="timeline-row">
+              <strong>1. 场景理解</strong>
+              <p>用 ChemDoc AI 说明：化学实验场景不能接受无来源回答，所以要用 RAG、引用、拒答和安全提示。</p>
+            </div>
+            <div class="timeline-row">
+              <strong>2. 风险控制</strong>
+              <p>用 SafetyLens 说明：高风险 AI 产品不能让模型做最终责任人，要用规则、人审和审计留痕。</p>
+            </div>
+            <div class="timeline-row">
+              <strong>3. 评测上线</strong>
+              <p>用 EvalOps Lite 说明：AI 功能上线不是感觉变好，而是通过测试集、指标、门禁和回归样本证明变好。</p>
+            </div>
+            <div class="timeline-row">
+              <strong>4. Agent 加分</strong>
+              <p>用 InterviewMate AI 说明：Agent 不是多轮聊天，而是有目标、阶段、状态和评分标准的任务流程。</p>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

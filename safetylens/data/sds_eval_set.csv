@@ -1,0 +1,13 @@
+case_id,chemical,cas,risk_level,sds_snippet,expected_fields,expected_rule_check,expected_review
+SL-001,乙醚,60-29-7,high,"Highly flammable liquid and vapor. Keep away from heat, sparks, open flames. Incompatible with oxidizing agents.","flammable;PPE:goggles,gloves;storage:flammable cabinet","远离热源;远离氧化剂;防火柜储存","EHS 确认"
+SL-002,浓硫酸,7664-93-9,high,"Causes severe skin burns and eye damage. Reacts violently with water and bases. Wear protective gloves and eye protection.","corrosive;PPE:acid gloves,goggles,lab coat;storage:corrosive cabinet","酸碱分储;加酸入水提示;腐蚀品柜","EHS 确认"
+SL-003,DMF,68-12-2,medium,"May damage fertility or the unborn child. Avoid breathing vapors. Wear protective gloves and use in a fume hood.","health hazard;PPE:nitrile gloves,goggles;storage:ventilated area","通风橱使用;皮肤接触提醒","管理员确认"
+SL-004,硝酸,7697-37-2,high,"Strong oxidizer. Causes severe burns. Keep away from combustible materials and reducing agents.","oxidizer;corrosive;PPE:goggles,acid gloves","远离有机物;远离还原剂;氧化剂分储","EHS 确认"
+SL-005,丙酮,67-64-1,medium,"Highly flammable liquid and vapor. Keep container tightly closed. Use explosion-proof equipment.","flammable;PPE:goggles,gloves;storage:flammable cabinet","远离热源;防火柜储存","管理员确认"
+SL-006,氢氧化钠,1310-73-2,high,"Causes severe skin burns and eye damage. Dissolution in water releases heat.","corrosive;PPE:alkali gloves,goggles;storage:corrosive cabinet","碱液配置放热提示;酸碱分储","EHS 确认"
+SL-007,过氧化氢,7722-84-1,high,"Oxidizing liquid. May intensify fire. Keep away from combustible materials.","oxidizer;PPE:goggles,gloves;storage:oxidizer area","远离可燃物;氧化剂分储","EHS 确认"
+SL-008,苯,71-43-2,high,"Highly flammable. May cause cancer. Avoid inhalation and skin contact.","flammable;carcinogen;PPE:goggles,gloves;storage:flammable cabinet","通风橱使用;致癌风险提示","EHS 确认"
+SL-009,乙醇,64-17-5,medium,"Highly flammable liquid and vapor. Keep away from heat and ignition sources.","flammable;PPE:goggles,gloves;storage:flammable cabinet","远离热源;防火柜储存","管理员确认"
+SL-010,氢化钠,7646-69-7,high,"In contact with water releases flammable gases. Causes severe burns.","water reactive;corrosive;PPE:goggles,gloves","禁水;惰性条件;高风险人审","EHS 确认"
+SL-011,甲醛,50-00-0,high,"Toxic if inhaled. Suspected of causing cancer. Use only in a well-ventilated area.","toxic;carcinogen;PPE:goggles,gloves,respiratory protection","通风橱;致癌风险;暴露控制","EHS 确认"
+SL-012,高锰酸钾,7722-64-7,medium,"Strong oxidizer. Keep away from reducing agents and organic materials.","oxidizer;PPE:goggles,gloves;storage:oxidizer area","远离有机物;氧化剂分储","管理员确认"
