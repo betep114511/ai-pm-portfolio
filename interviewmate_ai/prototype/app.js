@@ -1,5 +1,9 @@
 (function () {
-  const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
+  // Live demo backend = a cloudflared "quick tunnel" pointed at the devbox FastAPI.
+  // The URL is ephemeral (rotates whenever the tunnel restarts); override locally
+  // with: localStorage.setItem("AI_BACKEND_URL", "http://127.0.0.1:8787")
+  const DEFAULT_BACKEND_URL = "https://duration-walls-unknown-generators.trycloudflare.com";
+  const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || DEFAULT_BACKEND_URL;
 
   const openers = [
     "用 2 分钟介绍一个你做过的 AI 产品项目，包含用户、方案和关键指标。",

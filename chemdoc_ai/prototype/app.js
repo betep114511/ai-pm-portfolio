@@ -1,5 +1,9 @@
 (function () {
-  const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
+  // Live demo backend = a cloudflared "quick tunnel" pointed at the devbox FastAPI.
+  // The URL is ephemeral (rotates whenever the tunnel restarts); override locally
+  // with: localStorage.setItem("AI_BACKEND_URL", "http://127.0.0.1:8787")
+  const DEFAULT_BACKEND_URL = "https://duration-walls-unknown-generators.trycloudflare.com";
+  const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || DEFAULT_BACKEND_URL;
 
   const els = {
     healthPill: document.getElementById("healthPill"),
