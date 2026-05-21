@@ -105,6 +105,25 @@ const fields = {
   auditLog: document.querySelector("#auditLog")
 };
 
+async function postWithTimeout(url, payload, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`AI backend returned ${response.status}`);
+    }
+    return response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -144,18 +163,10 @@ function renderChemical(key) {
 }
 
 async function analyzeWithLocalAI(item) {
-  const response = await fetch(`${AI_BACKEND_URL}/api/safetylens/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  return postWithTimeout(`${AI_BACKEND_URL}/api/safetylens/analyze`, {
       chemical: item.name,
       sds_text: item.text
-    })
   });
-  if (!response.ok) {
-    throw new Error(`AI backend returned ${response.status}`);
-  }
-  return response.json();
 }
 
 document.querySelectorAll(".chem").forEach((button) => {
@@ -168,6 +179,10 @@ document.querySelectorAll(".chem").forEach((button) => {
 
 document.querySelector("#analyzeButton").addEventListener("click", async () => {
   const item = chemicals[currentChemicalKey];
+  const button = document.querySelector("#analyzeButton");
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "AI 分析中...";
   fields.reviewStatus.textContent = "AI 分析中...";
   try {
     const aiItem = await analyzeWithLocalAI(item);
@@ -181,7 +196,13 @@ document.querySelector("#analyzeButton").addEventListener("click", async () => {
     });
   } catch (error) {
     renderSafetyItem(item);
-    fields.reviewStatus.textContent = "本地 AI 未连接";
+    fields.reviewStatus.textContent = "演示数据";
+    fields.auditLog.insertAdjacentHTML("beforeend", `
+      <div class="event"><time>Fallback</time><p>本地 AI 后端未连接或响应超时，已使用内置演示数据。</p></div>
+    `);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
   }
 });
 

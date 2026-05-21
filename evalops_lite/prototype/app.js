@@ -114,6 +114,25 @@ const el = {
   caseTable: document.querySelector("#caseTable")
 };
 
+async function postWithTimeout(url, payload, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`AI backend returned ${response.status}`);
+    }
+    return response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -151,20 +170,12 @@ function renderVariant(key) {
 }
 
 async function judgeSampleWithLocalAI() {
-  const response = await fetch(`${AI_BACKEND_URL}/api/evalops/judge`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  return postWithTimeout(`${AI_BACKEND_URL}/api/evalops/judge`, {
       question: "配置稀盐酸前需要确认哪些安全事项？",
       answer: "需要 PPE、通风橱、加酸入水、废液分类，并附 SOP/SDS 引用。",
       gold_answer: "应提到 PPE、通风橱、加酸入水、废液分类和引用来源。",
       risk_level: "medium"
-    })
   });
-  if (!response.ok) {
-    throw new Error(`AI backend returned ${response.status}`);
-  }
-  return response.json();
 }
 
 document.querySelectorAll(".variant").forEach((button) => {
@@ -178,8 +189,10 @@ document.querySelectorAll(".variant").forEach((button) => {
 document.querySelector("#runButton").addEventListener("click", async () => {
   const active = document.querySelector(".variant.active").dataset.variant;
   renderVariant(active);
-  const originalLabel = document.querySelector("#runButton").textContent;
-  document.querySelector("#runButton").textContent = "AI Judge 运行中...";
+  const runButton = document.querySelector("#runButton");
+  const originalLabel = runButton.textContent;
+  runButton.disabled = true;
+  runButton.textContent = "AI Judge 运行中...";
   try {
     const judged = await judgeSampleWithLocalAI();
     const verdictMap = { pass: "通过", warn: "警告", fail: "失败" };
@@ -195,10 +208,20 @@ document.querySelector("#runButton").addEventListener("click", async () => {
       </tr>
     `);
   } catch (error) {
-    el.gateStatus.textContent = "本地 AI 未连接";
+    el.gateStatus.textContent = "演示数据";
     el.gateStatus.className = "gate fail";
+    el.caseTable.insertAdjacentHTML("afterbegin", `
+      <tr>
+        <td>LOCAL</td>
+        <td>后端状态</td>
+        <td>-</td>
+        <td><span class="tag warn">超时</span></td>
+        <td>本地 AI 未连接，使用演示数据</td>
+      </tr>
+    `);
   } finally {
-    document.querySelector("#runButton").textContent = originalLabel;
+    runButton.disabled = false;
+    runButton.textContent = originalLabel;
   }
 });
 

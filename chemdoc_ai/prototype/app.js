@@ -111,6 +111,25 @@ const feedbackStatus = document.querySelector("#feedbackStatus");
 const chips = Array.from(document.querySelectorAll(".chip"));
 const feedbackButtons = Array.from(document.querySelectorAll(".feedback-button"));
 
+async function postWithTimeout(url, payload, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`AI backend returned ${response.status}`);
+    }
+    return response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function fallbackAnswer(question) {
   return answers[question] || {
     risk: "medium",
@@ -157,18 +176,10 @@ function renderAnswer(question) {
 }
 
 async function askLocalAI(question) {
-  const response = await fetch(`${AI_BACKEND_URL}/api/chemdoc/ask`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  return postWithTimeout(`${AI_BACKEND_URL}/api/chemdoc/ask`, {
       question,
       context: "Demo knowledge base: SOP, SDS, chemistry paper excerpts. Return cautious cited answer."
-    })
   });
-  if (!response.ok) {
-    throw new Error(`AI backend returned ${response.status}`);
-  }
-  return response.json();
 }
 
 chips.forEach((chip) => {
@@ -197,7 +208,7 @@ askButton.addEventListener("click", async () => {
     feedbackStatus.textContent = "已使用本地 AI 后端生成。";
   } catch (error) {
     renderAnswer(question);
-    feedbackStatus.textContent = "本地 AI 后端未连接，已展示内置 mock 数据。";
+    feedbackStatus.textContent = "本地 AI 后端未连接或响应超时，已展示内置演示数据。";
   } finally {
     askButton.disabled = false;
     askButton.textContent = "生成引用回答";

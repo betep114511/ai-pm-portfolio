@@ -31,6 +31,25 @@ const scoreEls = [
   document.querySelector("#scoreRisk")
 ];
 
+async function postWithTimeout(url, payload, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`AI backend returned ${response.status}`);
+    }
+    return response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function addMessage(type, text) {
   const node = document.createElement("div");
   node.className = `msg ${type}`;
@@ -48,19 +67,11 @@ function renderQuestion() {
 }
 
 async function coachWithLocalAI(answer) {
-  const response = await fetch(`${AI_BACKEND_URL}/api/interviewmate/coach`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  return postWithTimeout(`${AI_BACKEND_URL}/api/interviewmate/coach`, {
       jd: "AI 产品经理，要求 LLM/RAG/Agent/Eval、产品指标和跨团队协作。",
       answer,
       stage: "mock_interview"
-    })
   });
-  if (!response.ok) {
-    throw new Error(`AI backend returned ${response.status}`);
-  }
-  return response.json();
 }
 
 document.querySelector("#submitButton").addEventListener("click", async () => {
@@ -80,7 +91,7 @@ document.querySelector("#submitButton").addEventListener("click", async () => {
     scoreEls[3].textContent = scores.risk ?? questions[index].scores[3];
   } catch (error) {
     addMessage("ai", questions[index].follow);
-    feedbackText.textContent = "本地 AI 后端未连接，已展示内置追问和反馈。";
+    feedbackText.textContent = "本地 AI 后端未连接或响应超时，已展示内置追问和反馈。";
   } finally {
     submitButton.disabled = false;
     submitButton.textContent = "提交回答";
