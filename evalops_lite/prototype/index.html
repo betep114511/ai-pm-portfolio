@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EvalOps Lite Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">E</div>
+          <div>
+            <strong>EvalOps Lite</strong>
+            <span>LLM 评测工作台</span>
+          </div>
+        </div>
+        <nav>
+          <button class="active" type="button">实验对比</button>
+          <button type="button">测试集</button>
+          <button type="button">失败案例</button>
+          <button type="button">上线门禁</button>
+        </nav>
+        <section class="dataset">
+          <span class="label">当前测试集</span>
+          <h2>RAG Knowledge QA v0.3</h2>
+          <p>126 cases · 24 high-risk · 18 regression</p>
+          <button type="button">导入线上失败样本</button>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>Prompt / Model 评测对比</h1>
+            <p>比较两个 AI 版本在质量、风险、成本和延迟上的表现。</p>
+          </div>
+          <div class="actions">
+            <button class="secondary" type="button">导出报告</button>
+            <button id="runButton" class="primary" type="button">重新运行评测</button>
+          </div>
+        </header>
+
+        <section class="experiment-switch">
+          <button class="variant active" type="button" data-variant="promptB">
+            <span>推荐版本</span>
+            <strong>Prompt B + RAG Top-5</strong>
+          </button>
+          <button class="variant" type="button" data-variant="promptA">
+            <span>基线版本</span>
+            <strong>Prompt A + RAG Top-3</strong>
+          </button>
+          <button class="variant" type="button" data-variant="modelC">
+            <span>候选版本</span>
+            <strong>Model C + Judge v2</strong>
+          </button>
+        </section>
+
+        <section class="score-grid">
+          <article class="score-card">
+            <span>准确率</span>
+            <strong id="accuracy">88%</strong>
+            <p id="accuracyDelta">+6.2% vs baseline</p>
+          </article>
+          <article class="score-card">
+            <span>幻觉率</span>
+            <strong id="hallucination">2.7%</strong>
+            <p id="hallucinationDelta">达标</p>
+          </article>
+          <article class="score-card">
+            <span>P95 延迟</span>
+            <strong id="latency">6.8s</strong>
+            <p id="latencyDelta">低于门禁 8s</p>
+          </article>
+          <article class="score-card">
+            <span>单次成本</span>
+            <strong id="cost">$0.014</strong>
+            <p id="costDelta">+9% cost</p>
+          </article>
+        </section>
+
+        <section class="main-grid">
+          <article class="panel">
+            <div class="panel-head">
+              <h2>上线门禁</h2>
+              <span id="gateStatus" class="gate pass">允许灰度</span>
+            </div>
+            <div id="gateList" class="gate-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h2>失败归因</h2>
+              <span>Top 5</span>
+            </div>
+            <div id="failureList" class="failure-list"></div>
+          </article>
+
+          <article class="panel wide">
+            <div class="panel-head">
+              <h2>样例评测结果</h2>
+              <span>LLM-as-Judge + 人工抽检</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Case</th>
+                  <th>场景</th>
+                  <th>风险</th>
+                  <th>结果</th>
+                  <th>失败标签</th>
+                </tr>
+              </thead>
+              <tbody id="caseTable"></tbody>
+            </table>
+          </article>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>
