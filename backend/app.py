@@ -99,19 +99,74 @@ def get_client() -> OpenAI:
 
 
 def extract_json(text: str) -> dict[str, Any]:
+    """Tolerant JSON parser for LLM output.
+
+    Order of attempts:
+    1. Parse the whole string verbatim.
+    2. Strip markdown ```json fences and try again.
+    3. Slice from first { to last } and try.
+    4. Walk the buffer with a string-aware brace counter and try every
+       balanced object we find; return the largest one that parses.
+    """
+    text = text.strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, flags=re.S)
+    fenced = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, flags=re.S)
     if fenced:
-        return json.loads(fenced.group(1))
+        candidate = fenced.group(1).strip()
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
 
     start = text.find("{")
     end = text.rfind("}")
     if start >= 0 and end > start:
-        return json.loads(text[start : end + 1])
+        try:
+            return json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    best: dict[str, Any] | None = None
+    if start >= 0:
+        depth = 0
+        in_str = False
+        esc = False
+        obj_start = -1
+        for i in range(start, len(text)):
+            ch = text[i]
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == '"':
+                in_str = not in_str
+                continue
+            if in_str:
+                continue
+            if ch == "{":
+                if depth == 0:
+                    obj_start = i
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0 and obj_start >= 0:
+                    try:
+                        candidate = json.loads(text[obj_start : i + 1])
+                        if isinstance(candidate, dict) and (
+                            best is None or len(text[obj_start : i + 1]) > len(json.dumps(best))
+                        ):
+                            best = candidate
+                    except json.JSONDecodeError:
+                        pass
+                    obj_start = -1
+    if best is not None:
+        return best
 
     raise ValueError("Model did not return valid JSON")
 
@@ -170,6 +225,121 @@ def to_openai_messages(
 
 def sse_pack(event: str, data: dict[str, Any]) -> bytes:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
+
+
+def stream_json_with_body_field(
+    system_prompt: str,
+    user_payload: dict[str, Any],
+    body_field: str = "body",
+    temperature: float = 0.3,
+) -> Iterable[bytes]:
+    """Stream a strict-JSON model response with progressive UX.
+
+    The model is asked to return JSON. While the response streams in we
+    incrementally extract the value of `body_field` (the prose field the UI
+    types out, e.g. "body" / "feedback" / "summary_text") and forward it as
+    `event: body_delta`. When the stream finishes we parse the whole JSON
+    once and emit it as `event: result` so the frontend can render the
+    structured side-panels (citations, scores, badges, ...).
+
+    Schema requirement: the prose field must be a plain JSON string. To
+    keep partial-extraction simple we never split mid-escape: if the tail
+    of the buffer ends with an odd number of backslashes we hold one byte
+    back until the next chunk.
+    """
+    client = get_client()
+    started = time.time()
+    body_open_re = re.compile(rf'"{re.escape(body_field)}"\s*:\s*"')
+    body_started = False
+    body_done = False
+    cursor = 0
+    full: list[str] = []
+    try:
+        stream = client.chat.completions.create(
+            model=AI_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": json.dumps(user_payload, ensure_ascii=False, indent=2),
+                },
+            ],
+            temperature=temperature,
+            stream=True,
+        )
+        for chunk in stream:
+            try:
+                delta = chunk.choices[0].delta.content or ""
+            except (AttributeError, IndexError):
+                delta = ""
+            if not delta:
+                continue
+            full.append(delta)
+            buf = "".join(full)
+
+            if not body_started:
+                m = body_open_re.search(buf)
+                if m:
+                    body_started = True
+                    cursor = m.end()
+                else:
+                    continue
+
+            if body_done:
+                continue
+
+            # Walk buf[cursor:] looking for the closing unescaped quote.
+            i = cursor
+            while i < len(buf):
+                ch = buf[i]
+                if ch == "\\":
+                    # Skip the escape pair; if pair is split across chunks
+                    # we'll just stop and resume next time.
+                    if i + 1 >= len(buf):
+                        break
+                    i += 2
+                    continue
+                if ch == '"':
+                    seg = buf[cursor:i]
+                    if seg:
+                        try:
+                            text = json.loads('"' + seg + '"')
+                        except json.JSONDecodeError:
+                            text = seg
+                        yield sse_pack("body_delta", {"text": text})
+                    cursor = i + 1
+                    body_done = True
+                    break
+                i += 1
+            else:
+                # No closing quote yet; emit everything up to i, leaving a
+                # potential trailing backslash for the next chunk.
+                end = i
+                if end > 0 and buf[end - 1] == "\\":
+                    end -= 1
+                if end > cursor:
+                    seg = buf[cursor:end]
+                    try:
+                        text = json.loads('"' + seg + '"')
+                    except json.JSONDecodeError:
+                        text = seg
+                    yield sse_pack("body_delta", {"text": text})
+                    cursor = end
+
+        elapsed_ms = int((time.time() - started) * 1000)
+        raw = "".join(full)
+        try:
+            data = extract_json(raw)
+        except Exception:
+            data = {"raw": raw}
+        if isinstance(data, dict):
+            data.setdefault("_meta", {})
+            data["_meta"].update({"model": AI_MODEL, "latency_ms": elapsed_ms})
+        yield sse_pack("result", data)
+    except HTTPException as exc:
+        yield sse_pack("error", {"detail": exc.detail, "status": exc.status_code})
+    except Exception as exc:  # noqa: BLE001
+        yield sse_pack("error", {"detail": str(exc), "status": 500})
 
 
 def stream_chat(messages: list[dict[str, str]], temperature: float = 0.4) -> Iterable[bytes]:
@@ -239,13 +409,15 @@ Rules:
 2. If the snippets do not contain enough evidence, set risk to "high" and clearly refuse.
 3. Risk levels: low (routine info), medium (safety-relevant), high (PPE/SDS/risky operations or unclear evidence).
 4. Always answer in Chinese. Citations must quote the snippet ID and a short supporting sentence.
-Return JSON only. Schema:
+
+Return JSON only. The "body" field MUST appear first so streaming clients can
+display it progressively. Schema:
 {
+  "body": "answer in Chinese, 2-4 sentences",
+  "title": "short answer title in Chinese",
   "risk": "low|medium|high",
   "riskText": "低风险|中风险|高风险",
   "confidence": "0-100%",
-  "title": "short answer title in Chinese",
-  "body": "answer in Chinese, 2-4 sentences",
   "safety": "specific safety note in Chinese",
   "retrieval": "brief retrieval/source note",
   "citations": [{"title": "source label", "text": "supporting quote from the user knowledge"}]
@@ -253,14 +425,26 @@ Return JSON only. Schema:
 """
 
 
-@app.post("/api/chemdoc/ask")
-def chemdoc_ask(req: ChemDocRequest) -> dict[str, Any]:
-    payload = {
+def _chemdoc_payload(req: ChemDocRequest) -> dict[str, Any]:
+    return {
         "question": req.question,
         "context": req.context or "lab knowledge: SOP, SDS, paper excerpts",
-        "knowledge": req.knowledge or "(no user knowledge provided; reply with low confidence and refuse if unsafe.)",
+        "knowledge": req.knowledge
+        or "(no user knowledge provided; reply with low confidence and refuse if unsafe.)",
     }
-    return complete_json(CHEMDOC_SYSTEM, payload)
+
+
+@app.post("/api/chemdoc/ask")
+def chemdoc_ask(req: ChemDocRequest) -> dict[str, Any]:
+    return complete_json(CHEMDOC_SYSTEM, _chemdoc_payload(req))
+
+
+@app.post("/api/chemdoc/ask/stream")
+def chemdoc_ask_stream(req: ChemDocRequest) -> StreamingResponse:
+    return StreamingResponse(
+        stream_json_with_body_field(CHEMDOC_SYSTEM, _chemdoc_payload(req), body_field="body"),
+        media_type="text/event-stream",
+    )
 
 
 # ---------- SafetyLens ----------
@@ -268,9 +452,15 @@ def chemdoc_ask(req: ChemDocRequest) -> dict[str, Any]:
 
 SAFETYLENS_SYSTEM = """\
 You are SafetyLens, an SDS extraction and EHS review assistant for chemical labs.
-Be conservative on high-risk chemicals. All output must be in Chinese (except CAS numbers and English SDS quotes).
-Return JSON only. Schema:
+Be conservative on high-risk chemicals. All output must be in Chinese
+(except CAS numbers and English SDS quotes).
+
+Return JSON only. The "summary" field MUST come first; it should be a
+2-4 sentence Chinese narrative the UI types out (mention compound type,
+key risks, what you found in the SDS, what the next human step should be).
+Then deliver the structured analysis. Schema:
 {
+  "summary": "2-4 sentence Chinese narrative — streams character by character",
   "name": "display title in Chinese",
   "meta": "CAS / risk class / review status summary",
   "score": "0-100%",
@@ -288,8 +478,15 @@ Return JSON only. Schema:
 
 @app.post("/api/safetylens/analyze")
 def safetylens_analyze(req: SafetyLensRequest) -> dict[str, Any]:
-    payload = model_to_dict(req)
-    return complete_json(SAFETYLENS_SYSTEM, payload)
+    return complete_json(SAFETYLENS_SYSTEM, model_to_dict(req))
+
+
+@app.post("/api/safetylens/analyze/stream")
+def safetylens_analyze_stream(req: SafetyLensRequest) -> StreamingResponse:
+    return StreamingResponse(
+        stream_json_with_body_field(SAFETYLENS_SYSTEM, model_to_dict(req), body_field="summary"),
+        media_type="text/event-stream",
+    )
 
 
 # ---------- EvalOps Lite ----------
@@ -300,8 +497,13 @@ You are EvalOps Lite, a strict LLM-as-Judge for AI product teams.
 For each case, judge accuracy / grounding / safety / format on 0-100,
 pick a failure tag (or "-" if pass), explain in 1-2 Chinese sentences,
 and recommend a gate decision.
-Return JSON only. Schema:
+
+Return JSON only. The "summary_text" field MUST come first — a 2-4
+sentence Chinese narrative the UI types out (overall pass rate, where
+the batch is breaking, gate recommendation). Then the structured
+summary metrics and per-case verdicts. Schema:
 {
+  "summary_text": "2-4 sentence Chinese narrative — streams character by character",
   "summary": {
     "accuracy": "percentage string",
     "hallucination": "percentage string",
@@ -328,12 +530,25 @@ Return JSON only. Schema:
 """
 
 
-@app.post("/api/evalops/judge")
-def evalops_judge(req: EvalOpsRequest) -> dict[str, Any]:
+def _evalops_payload(req: EvalOpsRequest) -> dict[str, Any]:
     if not req.cases:
         raise HTTPException(status_code=400, detail="cases must be non-empty")
-    payload = {"cases": [model_to_dict(c) for c in req.cases]}
-    return complete_json(EVALOPS_SYSTEM, payload)
+    return {"cases": [model_to_dict(c) for c in req.cases]}
+
+
+@app.post("/api/evalops/judge")
+def evalops_judge(req: EvalOpsRequest) -> dict[str, Any]:
+    return complete_json(EVALOPS_SYSTEM, _evalops_payload(req))
+
+
+@app.post("/api/evalops/judge/stream")
+def evalops_judge_stream(req: EvalOpsRequest) -> StreamingResponse:
+    return StreamingResponse(
+        stream_json_with_body_field(
+            EVALOPS_SYSTEM, _evalops_payload(req), body_field="summary_text"
+        ),
+        media_type="text/event-stream",
+    )
 
 
 # ---------- InterviewMate ----------
@@ -346,8 +561,11 @@ Goals:
 - Score four dimensions 0-100: product structure, AI literacy, metrics sense, risk awareness.
 - Give a concrete Chinese improvement note (no fluff, no fabricated experience).
 - Suggest 3 short training actions.
-Return JSON only. Schema:
+
+Return JSON only. The "feedback" field MUST come first so streaming
+clients can type it out live. Schema:
 {
+  "feedback": "specific 3-6 sentence Chinese feedback — streams character by character",
   "follow_up": "one sharp Chinese follow-up question",
   "scores": {
     "product": 0-100,
@@ -355,14 +573,12 @@ Return JSON only. Schema:
     "metrics": 0-100,
     "risk": 0-100
   },
-  "feedback": "specific Chinese feedback",
   "training_plan": ["short Chinese action", "...", "..."]
 }
 """
 
 
-@app.post("/api/interviewmate/coach")
-def interviewmate_coach(req: InterviewMateRequest) -> dict[str, Any]:
+def _interviewmate_payload(req: InterviewMateRequest) -> dict[str, Any]:
     history_text = ""
     if req.history:
         rendered = []
@@ -370,13 +586,30 @@ def interviewmate_coach(req: InterviewMateRequest) -> dict[str, Any]:
             tag = "面试官" if m.role == "assistant" else "候选人"
             rendered.append(f"[{tag}] {m.content}")
         history_text = "\n".join(rendered)
-    payload = {
+    return {
         "jd": req.jd,
         "stage": req.stage,
         "history": history_text,
         "candidate_answer": req.answer,
     }
-    return complete_json(INTERVIEWMATE_SYSTEM, payload, temperature=0.5)
+
+
+@app.post("/api/interviewmate/coach")
+def interviewmate_coach(req: InterviewMateRequest) -> dict[str, Any]:
+    return complete_json(INTERVIEWMATE_SYSTEM, _interviewmate_payload(req), temperature=0.5)
+
+
+@app.post("/api/interviewmate/coach/stream")
+def interviewmate_coach_stream(req: InterviewMateRequest) -> StreamingResponse:
+    return StreamingResponse(
+        stream_json_with_body_field(
+            INTERVIEWMATE_SYSTEM,
+            _interviewmate_payload(req),
+            body_field="feedback",
+            temperature=0.5,
+        ),
+        media_type="text/event-stream",
+    )
 
 
 @app.post("/api/interviewmate/chat/stream")

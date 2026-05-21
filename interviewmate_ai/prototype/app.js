@@ -183,10 +183,15 @@
       els.planList.innerHTML = `<li>启动本地 AI 后端以获得真实评分。</li><li>给项目补 3 个数据指标。</li><li>准备一个"模型答错"的兜底案例。</li>`;
       return;
     }
+    els.feedbackText.textContent = "";
+    els.planList.innerHTML = "<li>AI 评分生成中…</li>";
+    let feedbackAccum = "";
+    let finalResult = null;
+    let streamError = null;
     try {
-      const r = await fetch(`${AI_BACKEND_URL}/api/interviewmate/coach`, {
+      const r = await fetch(`${AI_BACKEND_URL}/api/interviewmate/coach/stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
         body: JSON.stringify({
           jd: els.jdInput.value.trim(),
           answer,
@@ -194,20 +199,60 @@
           history,
         }),
       });
-      if (!r.ok) throw new Error(`backend ${r.status}`);
-      const data = await r.json();
-      const scores = data.scores || {};
+      if (!r.ok || !r.body) throw new Error(`backend ${r.status}`);
+
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const events = buf.split("\n\n");
+        buf = events.pop() || "";
+        for (const evt of events) {
+          let event = "message";
+          let data = "";
+          for (const line of evt.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data += line.slice(5).replace(/^\s/, "");
+          }
+          if (!data) continue;
+          let parsed;
+          try { parsed = JSON.parse(data); } catch { continue; }
+          if (event === "body_delta" && parsed.text) {
+            feedbackAccum += parsed.text;
+            els.feedbackText.textContent = feedbackAccum;
+          } else if (event === "result") {
+            if (parsed && typeof parsed.raw === "string") {
+              try { finalResult = { ...JSON.parse(parsed.raw), _meta: parsed._meta }; continue; } catch (_) {}
+            }
+            finalResult = parsed;
+          } else if (event === "error") {
+            streamError = parsed;
+          }
+        }
+      }
+
+      if (streamError) throw new Error(streamError.detail || "stream error");
+      if (!finalResult) throw new Error("no result event");
+
+      const scores = finalResult.scores || {};
       setScore(scores.product, els.scoreProduct, els.barProduct);
       setScore(scores.ai, els.scoreAI, els.barAI);
       setScore(scores.metrics, els.scoreMetric, els.barMetric);
       setScore(scores.risk, els.scoreRisk, els.barRisk);
-      els.feedbackText.textContent = data.feedback || "—";
-      const plan = Array.isArray(data.training_plan) ? data.training_plan : [];
+      els.feedbackText.textContent = feedbackAccum || finalResult.feedback || "—";
+      const plan = Array.isArray(finalResult.training_plan) ? finalResult.training_plan : [];
       els.planList.innerHTML = plan.length
         ? plan.map((p) => `<li>${escapeHtml(p)}</li>`).join("")
         : "<li>暂无训练计划。</li>";
+      if (finalResult._meta && finalResult._meta.model) {
+        els.rtModel.innerHTML = `<strong>${finalResult._meta.model}</strong>`;
+      }
     } catch (e) {
-      els.feedbackText.textContent = "评分失败：" + (e.message || "未知错误");
+      els.feedbackText.textContent = feedbackAccum || ("评分失败：" + (e.message || "未知错误"));
+      els.planList.innerHTML = "<li>评分流被打断，请重试或检查后端日志。</li>";
     }
   }
 

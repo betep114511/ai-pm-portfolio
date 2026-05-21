@@ -91,6 +91,8 @@
     ruleList: document.getElementById("ruleList"),
     checklist: document.getElementById("checklist"),
     auditLog: document.getElementById("auditLog"),
+    streamSummary: document.getElementById("streamSummary"),
+    streamStatus: document.getElementById("streamStatus"),
   };
 
   let backendReady = false;
@@ -152,6 +154,40 @@
     }
   }
 
+  async function readSSE(response, handlers) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let event = "message";
+        let data = "";
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).replace(/^\s/, "");
+        }
+        let parsed;
+        try { parsed = JSON.parse(data); } catch { parsed = { raw: data }; }
+        const h = handlers[event];
+        if (h) h(parsed);
+      }
+    }
+  }
+
+  function resetForStream() {
+    if (els.streamSummary) {
+      els.streamSummary.textContent = "";
+      els.streamSummary.classList.add("streaming");
+    }
+    if (els.streamStatus) els.streamStatus.textContent = "AI 正在书写摘要…";
+  }
+
   async function analyze() {
     const chemical = els.chemInput.value.trim();
     const sds = els.sdsInput.value.trim();
@@ -162,25 +198,55 @@
     }
     els.analyzeBtn.disabled = true;
     els.analyzeBtn.textContent = "AI 分析中…";
-    els.reviewStatus.textContent = backendReady ? "LLM 分析中…" : "兜底分析中…";
+    els.reviewStatus.textContent = backendReady ? "LLM 流式分析…" : "兜底分析中…";
     const started = performance.now();
+
+    if (backendReady) resetForStream();
+
     try {
       if (!backendReady) throw new Error("offline");
-      const r = await fetch(`${AI_BACKEND_URL}/api/safetylens/analyze`, {
+      const r = await fetch(`${AI_BACKEND_URL}/api/safetylens/analyze/stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
         body: JSON.stringify({ chemical, sds_text: sds, extra_rules: rules || null }),
       });
-      if (!r.ok) throw new Error(`backend ${r.status}`);
-      const data = await r.json();
+      if (!r.ok || !r.body) throw new Error(`backend ${r.status}`);
+
+      let summaryAccum = "";
+      let finalResult = null;
+      let streamError = null;
+      await readSSE(r, {
+        body_delta: (d) => {
+          summaryAccum += d.text || "";
+          if (els.streamSummary) els.streamSummary.textContent = summaryAccum;
+        },
+        result: (d) => {
+          if (d && typeof d.raw === "string") {
+            try { finalResult = { ...JSON.parse(d.raw), _meta: d._meta }; return; } catch (_) {}
+          }
+          finalResult = d;
+        },
+        error: (d) => { streamError = d; },
+      });
+
+      if (els.streamSummary) els.streamSummary.classList.remove("streaming");
+      if (streamError) throw new Error(streamError.detail || "stream error");
+      if (!finalResult) throw new Error("no result event");
+
       const elapsed = (performance.now() - started) / 1000;
       els.rtLatency.innerHTML = `<strong>${elapsed.toFixed(1)}s</strong>`;
-      if (data._meta && data._meta.model) {
-        els.rtModel.innerHTML = `<strong>${data._meta.model}</strong>`;
+      if (finalResult._meta && finalResult._meta.model) {
+        els.rtModel.innerHTML = `<strong>${finalResult._meta.model}</strong>`;
       }
-      data.text = data.text || sds;
-      render(data, "ai");
+      finalResult.text = finalResult.text || sds;
+      if (els.streamSummary && (summaryAccum || finalResult.summary)) {
+        els.streamSummary.textContent = summaryAccum || finalResult.summary || "";
+      }
+      if (els.streamStatus) els.streamStatus.textContent = "已使用实时 LLM 流式生成";
+      render(finalResult, "ai");
     } catch (e) {
+      if (els.streamSummary) els.streamSummary.classList.remove("streaming");
+      if (els.streamStatus) els.streamStatus.textContent = "未启用 AI · 使用兜底数据";
       const elapsed = (performance.now() - started) / 1000;
       els.rtLatency.innerHTML = `<strong>${elapsed.toFixed(1)}s</strong>`;
       const active = els.presetRow.querySelector(".preset.active");
@@ -195,6 +261,10 @@
         audit: ["本地后端离线，使用兜底数据"],
       };
       mock.text = sds;
+      if (els.streamSummary) {
+        els.streamSummary.textContent =
+          "本地未启用 LLM，已展示兜底数据。启动 ./scripts/run_ai_backend.sh 后，AI 会基于您粘贴的 SDS 流式生成 2-4 句话的整体判断，并在下方填好字段、规则和审计。";
+      }
       render(mock, "mock");
     } finally {
       els.analyzeBtn.disabled = false;
