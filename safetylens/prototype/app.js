@@ -1,8 +1,10 @@
 (function () {
-  // Live demo backend = a cloudflared "quick tunnel" pointed at the devbox FastAPI.
-  // The URL is ephemeral (rotates whenever the tunnel restarts); override locally
-  // with: localStorage.setItem("AI_BACKEND_URL", "http://127.0.0.1:8787")
-  const DEFAULT_BACKEND_URL = "https://duration-walls-unknown-generators.trycloudflare.com";
+  // The public github.io demo intentionally exposes NO live backend, so we
+  // never burn an API key for random visitors. Run the FastAPI backend on
+  // YOUR own machine (see README "本地 AI 调用") and it will be picked up
+  // automatically. To point at a remote backend, set localStorage
+  // AI_BACKEND_URL beforehand.
+  const DEFAULT_BACKEND_URL = "http://127.0.0.1:8787";
   const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || DEFAULT_BACKEND_URL;
 
   const presets = {
