@@ -54,14 +54,22 @@
 
 ## 材料说明
 
-- `projects_for_resume.md`：可直接做作品集/简历项目的 4 个项目方案。
-- `resume_snippets.md`：简历项目经历、个人介绍、转行解释话术。
-- `interview_guide_ai_pm.md`：AI 产品经理面经、题库和回答框架。
-- `chemdoc_ai/`：已完成的第一个完整作品集项目，包含 PRD、用户研究、竞品分析、评测集、Case Study、面试讲述稿和可打开原型。
-- `safetylens/`：已完成的第二个完整作品集项目，强调 SDS 安全审核、人机协同、规则校验和审计留痕。
-- `evalops_lite/`：已完成的第三个完整作品集项目，强调 LLM 评测、Prompt/模型对比、上线门禁和失败案例回流。
-- `interviewmate_ai/`：已完成的补充作品集项目，强调 Agent 流程、JD 解析、多轮追问和评分 Rubric。
-- `portfolio_presentation_guide.md`：三个项目如何串成一条作品集主线。
+公开内容（会被部署到 github.io demo 站）：
+
+- `chemdoc_ai/`：第一个完整作品集项目，包含 PRD、用户研究、竞品分析、评测集、Case Study、面试讲述稿和可打开原型。
+- `safetylens/`：第二个完整作品集项目，强调 SDS 安全审核、人机协同、规则校验和审计留痕。
+- `evalops_lite/`：第三个完整作品集项目，强调 LLM 评测、Prompt/模型对比、上线门禁和失败案例回流。
+- `interviewmate_ai/`：补充作品集项目，强调 Agent 流程、JD 解析、多轮追问和评分 Rubric。
+- `backend/`：FastAPI 服务，本地起一份即可让上面 4 个原型走真实 LLM。
+
+私人笔记（仅本地 / repo 可见，**不会**被部署到 demo 站）：
+
+- `_private/projects_for_resume.md`：4 个项目的简历/作品集方案稿。
+- `_private/resume_snippets.md`：简历项目经历、个人介绍、转行解释话术。
+- `_private/interview_guide_ai_pm.md`：AI 产品经理面经、题库和回答框架。
+- `_private/portfolio_presentation_guide.md`：作品集 10 分钟讲解主线。
+
+`_private/` 已在 `.github/workflows/pages.yml` 的 rsync exclude 里，gh-pages 分支不会包含这些文件。
 
 ## 已完成项目矩阵
 

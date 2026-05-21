@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
-      - '*.md'
+      - 'README.md'
       - '.nojekyll'
       - 'chemdoc_ai/**'
       - 'safetylens/**'
@@ -42,9 +42,13 @@ jobs:
             --exclude='backend/' \
             --exclude='scripts/' \
             --exclude='_publish/' \
+            --exclude='_private/' \
             --exclude='.env*' \
             ./ _publish/
           test -f _publish/.nojekyll || touch _publish/.nojekyll
+          # belt-and-suspenders: never ship internal notes; only README.md may
+          # remain at the publish root.
+          find _publish -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -delete
           echo '---- published files ----'
           ls -la _publish
           du -sh _publish
