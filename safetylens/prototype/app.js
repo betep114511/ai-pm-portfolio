@@ -88,6 +88,9 @@ const chemicals = {
   }
 };
 
+const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
+let currentChemicalKey = "ether";
+
 const fields = {
   chemicalName: document.querySelector("#chemicalName"),
   chemicalMeta: document.querySelector("#chemicalMeta"),
@@ -102,8 +105,16 @@ const fields = {
   auditLog: document.querySelector("#auditLog")
 };
 
-function renderChemical(key) {
-  const item = chemicals[key];
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderSafetyItem(item) {
   fields.chemicalName.textContent = item.name;
   fields.chemicalMeta.textContent = item.meta;
   fields.extractScore.textContent = item.score;
@@ -113,18 +124,38 @@ function renderChemical(key) {
   fields.sdsText.textContent = item.text;
 
   fields.fieldList.innerHTML = item.fields.map(([name, value, score]) => `
-    <div class="field"><span>${name}</span><strong>${value}</strong><span class="score">${score}</span></div>
+    <div class="field"><span>${escapeHtml(name)}</span><strong>${escapeHtml(value)}</strong><span class="score">${escapeHtml(score)}</span></div>
   `).join("");
 
   fields.ruleList.innerHTML = item.rules.map(([level, title, text]) => `
-    <div class="rule ${level}"><strong>${title}</strong><p>${text}</p></div>
+    <div class="rule ${escapeHtml(level)}"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>
   `).join("");
 
-  fields.checklist.innerHTML = item.checklist.map((task) => `<li>${task}</li>`).join("");
+  fields.checklist.innerHTML = item.checklist.map((task) => `<li>${escapeHtml(task)}</li>`).join("");
 
   fields.auditLog.innerHTML = item.audit.map((event, index) => `
-    <div class="event"><time>Step ${index + 1}</time><p>${event}</p></div>
+    <div class="event"><time>Step ${index + 1}</time><p>${escapeHtml(event)}</p></div>
   `).join("");
+}
+
+function renderChemical(key) {
+  currentChemicalKey = key;
+  renderSafetyItem(chemicals[key]);
+}
+
+async function analyzeWithLocalAI(item) {
+  const response = await fetch(`${AI_BACKEND_URL}/api/safetylens/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chemical: item.name,
+      sds_text: item.text
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`AI backend returned ${response.status}`);
+  }
+  return response.json();
 }
 
 document.querySelectorAll(".chem").forEach((button) => {
@@ -133,6 +164,25 @@ document.querySelectorAll(".chem").forEach((button) => {
     button.classList.add("active");
     renderChemical(button.dataset.chemical);
   });
+});
+
+document.querySelector("#analyzeButton").addEventListener("click", async () => {
+  const item = chemicals[currentChemicalKey];
+  fields.reviewStatus.textContent = "AI 分析中...";
+  try {
+    const aiItem = await analyzeWithLocalAI(item);
+    renderSafetyItem({
+      ...item,
+      ...aiItem,
+      fields: Array.isArray(aiItem.fields) ? aiItem.fields : item.fields,
+      rules: Array.isArray(aiItem.rules) ? aiItem.rules : item.rules,
+      checklist: Array.isArray(aiItem.checklist) ? aiItem.checklist : item.checklist,
+      audit: Array.isArray(aiItem.audit) ? aiItem.audit : item.audit
+    });
+  } catch (error) {
+    renderSafetyItem(item);
+    fields.reviewStatus.textContent = "本地 AI 未连接";
+  }
 });
 
 document.querySelector("#approveButton").addEventListener("click", () => {

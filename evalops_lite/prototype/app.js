@@ -97,6 +97,8 @@ const variants = {
   }
 };
 
+const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
+
 const el = {
   accuracy: document.querySelector("#accuracy"),
   accuracyDelta: document.querySelector("#accuracyDelta"),
@@ -112,6 +114,15 @@ const el = {
   caseTable: document.querySelector("#caseTable")
 };
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function renderVariant(key) {
   const variant = variants[key];
   el.accuracy.textContent = variant.accuracy;
@@ -126,17 +137,34 @@ function renderVariant(key) {
   el.gateStatus.className = `gate ${variant.gateClass}`;
 
   el.gateList.innerHTML = variant.gates.map(([name, value, pass]) => `
-    <div class="gate-item"><span>${name}</span><strong class="${pass ? "pass" : "fail"}">${value}</strong></div>
+    <div class="gate-item"><span>${escapeHtml(name)}</span><strong class="${pass ? "pass" : "fail"}">${escapeHtml(value)}</strong></div>
   `).join("");
 
   el.failureList.innerHTML = variant.failures.map(([name, value]) => `
-    <div class="failure"><span>${name}</span><div class="bar"><i style="width:${value}%"></i></div><strong>${value}</strong></div>
+    <div class="failure"><span>${escapeHtml(name)}</span><div class="bar"><i style="width:${Number(value) || 0}%"></i></div><strong>${escapeHtml(value)}</strong></div>
   `).join("");
 
   el.caseTable.innerHTML = variant.cases.map(([id, scenario, risk, result, tag]) => {
     const cls = result === "通过" ? "pass" : result === "警告" ? "warn" : "fail";
-    return `<tr><td>${id}</td><td>${scenario}</td><td>${risk}</td><td><span class="tag ${cls}">${result}</span></td><td>${tag}</td></tr>`;
+    return `<tr><td>${escapeHtml(id)}</td><td>${escapeHtml(scenario)}</td><td>${escapeHtml(risk)}</td><td><span class="tag ${cls}">${escapeHtml(result)}</span></td><td>${escapeHtml(tag)}</td></tr>`;
   }).join("");
+}
+
+async function judgeSampleWithLocalAI() {
+  const response = await fetch(`${AI_BACKEND_URL}/api/evalops/judge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: "配置稀盐酸前需要确认哪些安全事项？",
+      answer: "需要 PPE、通风橱、加酸入水、废液分类，并附 SOP/SDS 引用。",
+      gold_answer: "应提到 PPE、通风橱、加酸入水、废液分类和引用来源。",
+      risk_level: "medium"
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`AI backend returned ${response.status}`);
+  }
+  return response.json();
 }
 
 document.querySelectorAll(".variant").forEach((button) => {
@@ -147,9 +175,31 @@ document.querySelectorAll(".variant").forEach((button) => {
   });
 });
 
-document.querySelector("#runButton").addEventListener("click", () => {
+document.querySelector("#runButton").addEventListener("click", async () => {
   const active = document.querySelector(".variant.active").dataset.variant;
   renderVariant(active);
+  const originalLabel = document.querySelector("#runButton").textContent;
+  document.querySelector("#runButton").textContent = "AI Judge 运行中...";
+  try {
+    const judged = await judgeSampleWithLocalAI();
+    const verdictMap = { pass: "通过", warn: "警告", fail: "失败" };
+    el.gateStatus.textContent = judged.gate_recommendation || "已完成 Judge";
+    el.gateStatus.className = `gate ${judged.verdict === "pass" ? "pass" : "fail"}`;
+    el.caseTable.insertAdjacentHTML("afterbegin", `
+      <tr>
+        <td>LIVE</td>
+        <td>本地 Judge</td>
+        <td>中</td>
+        <td><span class="tag ${judged.verdict === "pass" ? "pass" : judged.verdict === "warn" ? "warn" : "fail"}">${escapeHtml(verdictMap[judged.verdict] || "完成")}</span></td>
+        <td>${escapeHtml(judged.failure_tag || "-")}</td>
+      </tr>
+    `);
+  } catch (error) {
+    el.gateStatus.textContent = "本地 AI 未连接";
+    el.gateStatus.className = "gate fail";
+  } finally {
+    document.querySelector("#runButton").textContent = originalLabel;
+  }
 });
 
 renderVariant("promptB");

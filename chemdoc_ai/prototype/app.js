@@ -96,6 +96,7 @@ const answers = {
   }
 };
 
+const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
 const questionInput = document.querySelector("#questionInput");
 const askButton = document.querySelector("#askButton");
 const clearButton = document.querySelector("#clearButton");
@@ -110,8 +111,8 @@ const feedbackStatus = document.querySelector("#feedbackStatus");
 const chips = Array.from(document.querySelectorAll(".chip"));
 const feedbackButtons = Array.from(document.querySelectorAll(".feedback-button"));
 
-function renderAnswer(question) {
-  const answer = answers[question] || {
+function fallbackAnswer(question) {
+  return answers[question] || {
     risk: "medium",
     riskText: "需评估",
     confidence: "58%",
@@ -126,7 +127,9 @@ function renderAnswer(question) {
       }
     ]
   };
+}
 
+function renderAnswerObject(answer) {
   riskBadge.className = `risk-badge ${answer.risk}`;
   riskBadge.textContent = answer.riskText;
   answerTitle.textContent = answer.title;
@@ -140,9 +143,32 @@ function renderAnswer(question) {
   answer.citations.forEach((citation) => {
     const item = document.createElement("div");
     item.className = "citation";
-    item.innerHTML = `<strong>${citation.title}</strong><p>${citation.text}</p>`;
+    const title = document.createElement("strong");
+    const text = document.createElement("p");
+    title.textContent = citation.title;
+    text.textContent = citation.text;
+    item.append(title, text);
     citationList.appendChild(item);
   });
+}
+
+function renderAnswer(question) {
+  renderAnswerObject(fallbackAnswer(question));
+}
+
+async function askLocalAI(question) {
+  const response = await fetch(`${AI_BACKEND_URL}/api/chemdoc/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question,
+      context: "Demo knowledge base: SOP, SDS, chemistry paper excerpts. Return cautious cited answer."
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`AI backend returned ${response.status}`);
+  }
+  return response.json();
 }
 
 chips.forEach((chip) => {
@@ -154,10 +180,30 @@ chips.forEach((chip) => {
   });
 });
 
-askButton.addEventListener("click", () => {
-  renderAnswer(questionInput.value.trim());
+askButton.addEventListener("click", async () => {
+  const question = questionInput.value.trim();
+  askButton.disabled = true;
+  askButton.textContent = "AI 生成中...";
+  feedbackStatus.textContent = "正在尝试调用本地 AI 后端；不可用时会回到 mock 数据。";
+  try {
+    const aiAnswer = await askLocalAI(question);
+    const fallback = fallbackAnswer(question);
+    const mergedAnswer = {
+      ...fallback,
+      ...aiAnswer,
+      citations: Array.isArray(aiAnswer.citations) ? aiAnswer.citations : fallback.citations
+    };
+    renderAnswerObject(mergedAnswer);
+    feedbackStatus.textContent = "已使用本地 AI 后端生成。";
+  } catch (error) {
+    renderAnswer(question);
+    feedbackStatus.textContent = "本地 AI 后端未连接，已展示内置 mock 数据。";
+  } finally {
+    askButton.disabled = false;
+    askButton.textContent = "生成引用回答";
+  }
   chips.forEach((chip) => {
-    chip.classList.toggle("active", chip.dataset.question === questionInput.value.trim());
+    chip.classList.toggle("active", chip.dataset.question === question);
   });
 });
 

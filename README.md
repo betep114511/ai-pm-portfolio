@@ -101,6 +101,26 @@
 3. `interviewmate_ai/metrics_and_eval.md`
 4. `interviewmate_ai/data/question_bank.csv`
 
+## 本地 AI 调用
+
+公开的 GitHub Pages 版本默认使用内置 mock 数据，便于面试展示。若要接入真实模型，请在本地启动后端代理，API key 只放在本地环境变量里，不要写入前端代码或提交到 GitHub。
+
+```bash
+cd /mlx_devbox/users/xingtianshun/playground/ai-pm-portfolio
+export AI_API_KEY="your_local_key_here"
+export AI_BASE_URL="https://super-relay.byted.org/v1"
+export AI_MODEL="ark/k2"
+./scripts/run_ai_backend.sh
+```
+
+后端启动后，四个原型会优先请求 `http://127.0.0.1:8787`；如果本地后端不可用，会自动回到 mock 数据。
+
+安全提醒：
+
+- 不要把 API key 写进任何 `.js`、`.md`、`.html` 文件。
+- 不要提交 `.env`。
+- `backend/.env.example` 只是模板，不包含真实 key。
+
 ## 参考方向
 
 近期 AI PM 岗位普遍强调：从用户痛点定义产品、制定 roadmap、跨团队协作、定义模型/产品指标、做 eval、管理安全与可靠性风险。参考：

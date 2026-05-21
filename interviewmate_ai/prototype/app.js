@@ -19,6 +19,7 @@ const questions = [
   }
 ];
 
+const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
 let index = 0;
 const messages = document.querySelector("#messages");
 const answerInput = document.querySelector("#answerInput");
@@ -46,9 +47,44 @@ function renderQuestion() {
   });
 }
 
-document.querySelector("#submitButton").addEventListener("click", () => {
-  addMessage("user", answerInput.value.trim());
-  addMessage("ai", questions[index].follow);
+async function coachWithLocalAI(answer) {
+  const response = await fetch(`${AI_BACKEND_URL}/api/interviewmate/coach`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jd: "AI 产品经理，要求 LLM/RAG/Agent/Eval、产品指标和跨团队协作。",
+      answer,
+      stage: "mock_interview"
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`AI backend returned ${response.status}`);
+  }
+  return response.json();
+}
+
+document.querySelector("#submitButton").addEventListener("click", async () => {
+  const answer = answerInput.value.trim();
+  addMessage("user", answer);
+  const submitButton = document.querySelector("#submitButton");
+  submitButton.disabled = true;
+  submitButton.textContent = "AI 追问中...";
+  try {
+    const result = await coachWithLocalAI(answer);
+    addMessage("ai", result.follow_up || questions[index].follow);
+    feedbackText.textContent = result.feedback || questions[index].feedback;
+    const scores = result.scores || {};
+    scoreEls[0].textContent = scores.product ?? questions[index].scores[0];
+    scoreEls[1].textContent = scores.ai ?? questions[index].scores[1];
+    scoreEls[2].textContent = scores.metrics ?? questions[index].scores[2];
+    scoreEls[3].textContent = scores.risk ?? questions[index].scores[3];
+  } catch (error) {
+    addMessage("ai", questions[index].follow);
+    feedbackText.textContent = "本地 AI 后端未连接，已展示内置追问和反馈。";
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "提交回答";
+  }
 });
 
 document.querySelector("#nextButton").addEventListener("click", () => {
