@@ -3,82 +3,111 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ChemDoc AI Prototype</title>
+    <title>ChemDoc AI · 化学实验 RAG 助手</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="知识库导航">
+      <aside class="sidebar">
         <div class="brand-block">
           <div class="brand-mark">C</div>
           <div>
             <div class="brand-name">ChemDoc AI</div>
-            <div class="brand-subtitle">实验知识工作台</div>
+            <div class="brand-subtitle">化学实验 RAG · 引用式问答</div>
           </div>
         </div>
 
+        <div>
+          <span class="health-pill" id="healthPill">
+            <span class="dot"></span>
+            <span id="healthLabel">检测中…</span>
+          </span>
+        </div>
+
         <nav class="nav-list">
-          <button class="nav-item active" type="button">问答工作台</button>
-          <button class="nav-item" type="button">文档库</button>
-          <button class="nav-item" type="button">安全清单</button>
-          <button class="nav-item" type="button">评测看板</button>
+          <button class="nav-item active" type="button"><span class="nav-dot"></span> 问答工作台</button>
+          <button class="nav-item" type="button"><span class="nav-dot"></span> 文档库</button>
+          <button class="nav-item" type="button"><span class="nav-dot"></span> 安全清单</button>
+          <button class="nav-item" type="button"><span class="nav-dot"></span> 评测看板</button>
         </nav>
 
-        <section class="panel compact">
-          <div class="panel-heading">当前知识库</div>
-          <div class="library-name">高分子课题组 / 入门实验</div>
-          <div class="library-meta">28 份文档 · 6 类标签</div>
-        </section>
+        <div class="side-card">
+          <span class="section-label">当前知识库</span>
+          <div class="lib-name">高分子课题组 · 入门实验</div>
+          <div class="lib-meta">28 docs · 6 tags</div>
+        </div>
 
-        <section class="doc-list" aria-label="文档列表">
-          <div class="section-label">最近引用</div>
-          <button class="doc-row selected" type="button">
-            <span class="doc-type sop">SOP</span>
-            <span>酸碱溶液配置</span>
-          </button>
-          <button class="doc-row" type="button">
-            <span class="doc-type sds">SDS</span>
-            <span>盐酸安全说明</span>
-          </button>
-          <button class="doc-row" type="button">
-            <span class="doc-type paper">PDF</span>
-            <span>Polymer 2024 实验部分</span>
-          </button>
-          <button class="doc-row" type="button">
-            <span class="doc-type sop">SOP</span>
-            <span>废液分类流程</span>
-          </button>
-        </section>
+        <div>
+          <span class="section-label">最近引用</span>
+          <div class="doc-list">
+            <button class="doc-row selected" type="button">
+              <span class="doc-type sop">SOP</span>
+              <span>酸碱溶液配置</span>
+            </button>
+            <button class="doc-row" type="button">
+              <span class="doc-type sds">SDS</span>
+              <span>盐酸安全说明</span>
+            </button>
+            <button class="doc-row" type="button">
+              <span class="doc-type paper">PDF</span>
+              <span>Polymer 2024 实验部分</span>
+            </button>
+            <button class="doc-row" type="button">
+              <span class="doc-type sop">SOP</span>
+              <span>废液分类流程</span>
+            </button>
+          </div>
+        </div>
       </aside>
 
       <main class="workspace">
         <header class="topbar">
           <div>
-            <h1>引用式实验问答</h1>
-            <p>基于 SOP、SDS 和论文片段回答；无可靠来源时拒答。</p>
+            <div class="breadcrumb">prototype / chemdoc-ai / qa-workbench</div>
+            <h1>引用式实验问答工作台</h1>
+            <p class="tag-line">粘贴 SOP / SDS / 论文片段作为知识源，AI 基于片段回答并附引用；证据不足时拒答。</p>
           </div>
           <div class="topbar-actions">
-            <button class="icon-button" type="button" title="上传文档" aria-label="上传文档">+</button>
-            <button class="outline-button" type="button">导出记录</button>
+            <button class="btn" type="button" id="loadDemoBtn">载入示例</button>
+            <button class="btn" type="button" id="exportBtn">导出记录</button>
           </div>
         </header>
 
-        <section class="query-card">
-          <div class="query-head">
-            <label for="questionInput">用户问题</label>
-            <span id="riskBadge" class="risk-badge medium">中风险</span>
+        <div class="runtime-meta">
+          <span>backend <strong id="rtBackend">checking…</strong></span>
+          <span>model <strong id="rtModel">—</strong></span>
+          <span>latency <strong id="rtLatency">—</strong></span>
+          <span>source <strong id="rtSource">user-supplied</strong></span>
+        </div>
+
+        <section class="composer">
+          <div class="composer-grid">
+            <div class="composer-field">
+              <label for="questionInput">用户问题 <span class="hint">支持任意中英文化学/实验问题</span></label>
+              <textarea id="questionInput" rows="4" placeholder="例如：配置稀盐酸前需要确认哪些安全事项？">配置稀盐酸前需要确认哪些安全事项？</textarea>
+            </div>
+            <div class="composer-field">
+              <label for="knowledgeInput">知识片段 <span class="hint">粘贴你的 SOP / SDS / 论文段落，AI 只能基于这里的内容回答</span></label>
+              <textarea id="knowledgeInput" rows="4" placeholder="[snippet S1] SOP-酸碱配置 第 2 节：酸液稀释应在通风条件下进行，容器需贴明浓度和日期标签。&#10;[snippet S2] SDS-盐酸 防护措施：建议佩戴护目镜、防护手套和实验服，避免吸入酸雾。">[snippet S1] SOP-酸碱配置 第 2 节：酸液稀释应在通风条件下进行，容器需贴明浓度和日期标签，遵循加酸入水原则。
+[snippet S2] SDS-盐酸 防护措施：建议佩戴护目镜、防护手套和实验服，避免吸入酸雾。酸性废液单独收集。</textarea>
+            </div>
           </div>
-          <textarea id="questionInput" rows="3">配置稀盐酸前需要确认哪些安全事项？</textarea>
-          <div class="suggestions" aria-label="示例问题">
-            <button class="chip active" type="button" data-question="配置稀盐酸前需要确认哪些安全事项？">稀盐酸配置</button>
-            <button class="chip" type="button" data-question="论文中聚合反应的温度是多少？">论文条件</button>
-            <button class="chip" type="button" data-question="乙醚可以放在热源旁边吗？">乙醚储存</button>
-            <button class="chip" type="button" data-question="没有 SOP 的情况下能不能直接按网上步骤做危险反应？">无 SOP 实验</button>
-            <button class="chip" type="button" data-question="HPLC 样品进样前要过滤吗？">HPLC 进样</button>
-          </div>
-          <div class="query-actions">
-            <button id="askButton" class="primary-button" type="button">生成引用回答</button>
-            <button id="clearButton" class="ghost-button" type="button">清空</button>
+
+          <div class="composer-actions">
+            <div class="suggestions" id="suggestRow">
+              <button class="chip active" type="button" data-q="配置稀盐酸前需要确认哪些安全事项？" data-k="[snippet S1] SOP-酸碱配置 第 2 节：酸液稀释应在通风条件下进行，容器需贴明浓度和日期标签，遵循加酸入水原则。&#10;[snippet S2] SDS-盐酸 防护措施：建议佩戴护目镜、防护手套和实验服，避免吸入酸雾。酸性废液单独收集。">稀盐酸配置</button>
+              <button class="chip" type="button" data-q="论文里聚合反应的温度和气氛是多少？" data-k="[snippet P1] Paper Polymer 2024 Experimental: The polymerization mixture was maintained at 65 °C under nitrogen atmosphere for 8 hours.&#10;[snippet P2] Paper Polymer 2024 Table S1: Reaction temperature: 65 °C; atmosphere: N2; solvent: toluene.">论文条件</button>
+              <button class="chip" type="button" data-q="乙醚可以放在热源旁边吗？" data-k="[snippet S1] SDS-乙醚 储存条件: Keep away from heat, sparks, open flames and oxidizing materials. Store below 30 °C.&#10;[snippet S2] SOP-易燃品储存 第 1 节：易燃液体应存放于指定防火柜，远离热源和氧化剂。">乙醚储存</button>
+              <button class="chip" type="button" data-q="没有 SOP 的情况下能不能直接按网上步骤做危险反应？" data-k="[snippet R1] SOP-实验审批流程 高风险实验：高风险实验需完成书面风险评估，并经负责人确认后执行。&#10;[snippet R2] 实验室安全守则 第 4 节：未建立 SOP 的实验不得由新人独立开展。">无 SOP 实验</button>
+              <button class="chip" type="button" data-q="THF 怎么除水？" data-k="">空知识库测试</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-ghost" type="button" id="clearBtn">清空</button>
+              <button class="btn btn-primary" type="button" id="askBtn">生成引用回答 →</button>
+            </div>
           </div>
         </section>
 
@@ -87,90 +116,66 @@
             <div class="answer-header">
               <div>
                 <div class="eyebrow">AI 回答</div>
-                <h2 id="answerTitle">配置稀盐酸前需要确认 PPE、通风橱、加酸入水和废液分类。</h2>
+                <h2 id="answerTitle">在此显示 AI 基于你提供的知识片段生成的引用式回答…</h2>
+                <div class="confidence-block">
+                  <div class="confidence-bar"><div class="fill" id="confidenceFill" style="width: 0%"></div></div>
+                  <div class="confidence-value" id="confidenceValue">—</div>
+                </div>
               </div>
-              <div class="confidence">
-                <span id="confidenceValue">86%</span>
-                <small>置信度</small>
-              </div>
+              <span id="riskBadge" class="risk-badge medium">待评估</span>
             </div>
 
             <div class="answer-section">
               <h3>结论</h3>
-              <p id="answerBody">配置前应确认护目镜、防酸手套、实验服和通风条件；操作时遵循加酸入水原则，容器需要清晰标识，剩余液体进入酸性废液流程。</p>
+              <p id="answerBody">点击「生成引用回答」开始。AI 会基于你粘贴的知识片段作答，并标注来源。如果片段不足以支撑结论，会给出低置信度或拒答。</p>
             </div>
 
             <div class="answer-section safety-callout">
               <h3>风险提示</h3>
-              <p id="safetyBody">该问题涉及腐蚀性试剂，建议由熟悉 SOP 的人员确认后再进行操作。若 SOP 与 SDS 描述不一致，以实验室最新版 SOP 和安全负责人意见为准。</p>
+              <p id="safetyBody">等待 AI 生成…</p>
             </div>
 
             <div class="answer-section">
               <h3>引用来源</h3>
-              <div id="citationList" class="citation-list"></div>
+              <div id="citationList" class="citation-list">
+                <div class="citation"><strong>等待生成</strong><p>引用条目会在此列出，每条对应你提供的 snippet。</p></div>
+              </div>
             </div>
 
             <div class="feedback-row" aria-label="反馈">
-              <button class="feedback-button" type="button" data-feedback="useful">有用</button>
-              <button class="feedback-button" type="button" data-feedback="citation">引用不对</button>
-              <button class="feedback-button" type="button" data-feedback="incomplete">答案不完整</button>
-              <button class="feedback-button danger" type="button" data-feedback="risk">有风险</button>
+              <button class="feedback-btn" type="button" data-feedback="useful">👍 有用</button>
+              <button class="feedback-btn" type="button" data-feedback="citation">引用不对</button>
+              <button class="feedback-btn" type="button" data-feedback="incomplete">答案不完整</button>
+              <button class="feedback-btn danger" type="button" data-feedback="risk">⚠ 有风险</button>
             </div>
             <div id="feedbackStatus" class="feedback-status">等待用户反馈</div>
           </article>
 
-          <aside class="right-rail" aria-label="质量与上下文">
-            <section class="molecule-panel">
-              <div class="molecule-art" aria-hidden="true">
-                <span class="node n1"></span>
-                <span class="node n2"></span>
-                <span class="node n3"></span>
-                <span class="node n4"></span>
-                <span class="bond b1"></span>
-                <span class="bond b2"></span>
-                <span class="bond b3"></span>
-              </div>
-              <div>
-                <div class="panel-heading">检索上下文</div>
-                <div id="retrievalMeta" class="retrieval-meta">Top-5 片段 · SOP 优先 · SDS 补充</div>
-              </div>
-            </section>
+          <aside class="right-rail">
+            <div class="rail-card">
+              <h4>检索上下文</h4>
+              <div id="retrievalMeta" style="font-size: 13px; color: var(--ink-soft); line-height: 1.6;">等待生成 — 当前回答将基于你在左侧提供的知识片段。</div>
+            </div>
 
-            <section class="metric-panel">
-              <div class="section-label">本周质量</div>
-              <div class="metric-row">
-                <span>引用命中率</span>
-                <strong>88%</strong>
-              </div>
-              <div class="metric-row">
-                <span>幻觉率</span>
-                <strong>3.8%</strong>
-              </div>
-              <div class="metric-row">
-                <span>拒答正确率</span>
-                <strong>92%</strong>
-              </div>
-              <div class="metric-row">
-                <span>P95 延迟</span>
-                <strong>6.4s</strong>
-              </div>
-            </section>
+            <div class="rail-card">
+              <h4>本周质量指标</h4>
+              <div class="metric-row"><span>引用命中率</span><strong>88%</strong></div>
+              <div class="metric-row"><span>幻觉率</span><strong>3.8%</strong></div>
+              <div class="metric-row"><span>拒答正确率</span><strong>92%</strong></div>
+              <div class="metric-row"><span>P95 延迟</span><strong>6.4s</strong></div>
+            </div>
 
-            <section class="queue-panel">
-              <div class="section-label">待人工确认</div>
+            <div class="rail-card">
+              <h4>待人工确认</h4>
               <div class="queue-item high">
-                <span>高风险</span>
+                <span class="q-label">高风险</span>
                 <p>无 SOP 的危险反应请求</p>
               </div>
               <div class="queue-item medium">
-                <span>中风险</span>
+                <span class="q-label">中风险</span>
                 <p>异常现象处理建议</p>
               </div>
-              <div class="queue-item medium">
-                <span>中风险</span>
-                <p>引用片段不足的 SDS 回答</p>
-              </div>
-            </section>
+            </div>
           </aside>
         </section>
       </main>

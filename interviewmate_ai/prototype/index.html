@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>InterviewMate AI Prototype</title>
+    <title>InterviewMate AI · 多轮面试陪练</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -13,14 +16,28 @@
           <div class="mark">I</div>
           <div>
             <strong>InterviewMate AI</strong>
-            <span>AI PM 面试陪练</span>
+            <span>AI PM 面试陪练 Agent</span>
           </div>
         </div>
+
+        <span class="health-pill" id="healthPill">
+          <span class="dot"></span>
+          <span id="healthLabel">检测中…</span>
+        </span>
+
         <section class="jd-card">
-          <span>目标岗位</span>
-          <h2>AI 产品经理 · LLM 应用</h2>
-          <p>关键词：RAG、Prompt、Eval、Agent、指标体系</p>
+          <span class="label">目标岗位 JD</span>
+          <h2 id="jdTitle">AI 产品经理 · LLM 应用</h2>
+          <textarea id="jdInput" rows="6">AI 产品经理 · LLM 应用方向
+
+要求：
+- 1-3 年 AI / LLM 应用产品经验
+- 熟悉 RAG / Prompt / Eval / Agent
+- 能定义产品指标和上线门禁
+- 跨团队协作能力（算法/工程/业务）
+- 加分：垂直行业理解</textarea>
         </section>
+
         <nav>
           <button class="active" type="button">模拟面试</button>
           <button type="button">题库</button>
@@ -30,39 +47,69 @@
       </aside>
 
       <main class="main">
-        <header>
+        <header class="topbar">
           <div>
-            <h1>多轮追问模拟</h1>
-            <p>根据目标 JD 和用户回答，持续追问产品闭环、AI 理解和指标意识。</p>
+            <div class="breadcrumb">prototype / interviewmate / multi-turn</div>
+            <h1>多轮追问面试模拟</h1>
+            <p class="meta-line">AI 基于左侧 JD 持续追问，保留对话上下文。每轮给出四维评分和具体改进建议。</p>
           </div>
-          <button id="nextButton" type="button">下一题</button>
+          <div class="actions">
+            <button class="btn" type="button" id="resetBtn">重置对话</button>
+            <button class="btn primary" type="button" id="newQBtn">下一题 →</button>
+          </div>
         </header>
 
+        <div class="runtime-meta">
+          <span>backend <strong id="rtBackend">checking…</strong></span>
+          <span>model <strong id="rtModel">—</strong></span>
+          <span>turn <strong id="rtTurn">1</strong></span>
+          <span>latency <strong id="rtLatency">—</strong></span>
+        </div>
+
         <section class="layout">
-          <article class="chat panel">
+          <article class="chat">
+            <div class="chat-head">
+              <h2>面试对话</h2>
+              <span class="stage" id="stagePill">PROJECT DEEP DIVE</span>
+            </div>
             <div id="messages" class="messages"></div>
             <div class="answer-box">
-              <textarea id="answerInput" rows="4">我做过 ChemDoc AI，面向化学实验室新人，解决论文、SOP 和 SDS 查询低效的问题。核心方案是 RAG 知识库问答，回答必须附引用来源，并对高风险问题触发安全提示。</textarea>
-              <button id="submitButton" type="button">提交回答</button>
+              <textarea id="answerInput" placeholder="在这里输入你的回答，Enter 提交，Shift+Enter 换行。&#10;例如：我做过 ChemDoc AI…"></textarea>
+              <div class="actions-col">
+                <button class="btn primary" type="button" id="submitButton">提交回答</button>
+                <button class="btn" type="button" id="hintBtn">需要提示</button>
+              </div>
             </div>
           </article>
 
-          <aside class="panel report">
+          <aside class="report">
             <h2>实时评分</h2>
-            <div class="score"><span>产品结构</span><strong id="scoreProduct">82</strong></div>
-            <div class="score"><span>AI 理解</span><strong id="scoreAI">78</strong></div>
-            <div class="score"><span>指标意识</span><strong id="scoreMetric">74</strong></div>
-            <div class="score"><span>风险意识</span><strong id="scoreRisk">86</strong></div>
-            <div class="feedback">
-              <h3>改进建议</h3>
-              <p id="feedbackText">回答已经讲清楚用户和方案，建议补充北极星指标、幻觉率、引用命中率和上线门禁。</p>
+            <div class="score-row">
+              <div class="top"><span>产品结构</span><strong id="scoreProduct">—</strong></div>
+              <div class="score-bar"><i id="barProduct" style="width: 0%"></i></div>
             </div>
+            <div class="score-row">
+              <div class="top"><span>AI 理解</span><strong id="scoreAI">—</strong></div>
+              <div class="score-bar"><i id="barAI" style="width: 0%"></i></div>
+            </div>
+            <div class="score-row">
+              <div class="top"><span>指标意识</span><strong id="scoreMetric">—</strong></div>
+              <div class="score-bar"><i id="barMetric" style="width: 0%"></i></div>
+            </div>
+            <div class="score-row">
+              <div class="top"><span>风险意识</span><strong id="scoreRisk">—</strong></div>
+              <div class="score-bar"><i id="barRisk" style="width: 0%"></i></div>
+            </div>
+
+            <div class="feedback-card">
+              <h3>改进建议</h3>
+              <p id="feedbackText">提交回答后，AI 会基于 JD 给出具体的改进建议。</p>
+            </div>
+
             <div class="plan">
               <h3>今日训练</h3>
-              <ul>
-                <li>用 2 分钟讲完 ChemDoc AI。</li>
-                <li>补充 3 个 AI 质量指标。</li>
-                <li>准备“模型答错怎么办”的追问。</li>
+              <ul id="planList">
+                <li>请先开始一轮面试对话。</li>
               </ul>
             </div>
           </aside>

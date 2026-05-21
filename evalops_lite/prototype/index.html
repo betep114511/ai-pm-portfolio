@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EvalOps Lite Prototype</title>
+    <title>EvalOps Lite · LLM 评测工作台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -13,38 +16,99 @@
           <div class="mark">E</div>
           <div>
             <strong>EvalOps Lite</strong>
-            <span>LLM 评测工作台</span>
+            <span>LLM 评测 · 上线门禁</span>
           </div>
         </div>
+
+        <span class="health-pill" id="healthPill">
+          <span class="dot"></span>
+          <span id="healthLabel">检测中…</span>
+        </span>
+
         <nav>
           <button class="active" type="button">实验对比</button>
           <button type="button">测试集</button>
           <button type="button">失败案例</button>
           <button type="button">上线门禁</button>
         </nav>
+
         <section class="dataset">
           <span class="label">当前测试集</span>
           <h2>RAG Knowledge QA v0.3</h2>
-          <p>126 cases · 24 high-risk · 18 regression</p>
-          <button type="button">导入线上失败样本</button>
+          <p>126 cases · 24 high-risk</p>
+          <button type="button">+ 导入线上失败样本</button>
         </section>
       </aside>
 
       <main class="main">
         <header class="topbar">
           <div>
-            <h1>Prompt / Model 评测对比</h1>
-            <p>比较两个 AI 版本在质量、风险、成本和延迟上的表现。</p>
+            <div class="breadcrumb">prototype / evalops / judge-bench</div>
+            <h1>批量 LLM-as-Judge 工作台</h1>
+            <p class="meta-line">添加任意 Q / A / Gold / Risk，AI 作为 Judge 批量打分，给出失败标签与上线门禁建议。</p>
           </div>
           <div class="actions">
-            <button class="secondary" type="button">导出报告</button>
-            <button id="runButton" class="primary" type="button">重新运行评测</button>
+            <button class="btn" type="button" id="exportBtn">导出报告</button>
+            <button class="btn primary" type="button" id="runButton">运行评测 →</button>
           </div>
         </header>
 
+        <div class="runtime-meta">
+          <span>backend <strong id="rtBackend">checking…</strong></span>
+          <span>model <strong id="rtModel">—</strong></span>
+          <span>latency <strong id="rtLatency">—</strong></span>
+          <span>cases <strong id="rtCases">0</strong></span>
+        </div>
+
+        <section class="case-composer">
+          <div class="composer-head">
+            <h3>添加评测用例</h3>
+            <span class="stat-mini">已添加 <strong id="caseCount">0</strong> 个</span>
+          </div>
+          <form class="case-form" id="caseForm" onsubmit="return false">
+            <div class="field">
+              <label>场景</label>
+              <input id="cf-scenario" type="text" placeholder="例如：RAG 知识库" value="RAG 知识库" />
+            </div>
+            <div class="field">
+              <label>问题</label>
+              <textarea id="cf-question" rows="1" placeholder="用户问题">配置稀盐酸前要确认什么？</textarea>
+            </div>
+            <div class="field">
+              <label>AI 回答</label>
+              <textarea id="cf-answer" rows="1" placeholder="待评测答案">需要 PPE、通风、加酸入水、废液分类。</textarea>
+            </div>
+            <div class="field">
+              <label>风险</label>
+              <select id="cf-risk">
+                <option value="低">低</option>
+                <option value="中" selected>中</option>
+                <option value="高">高</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <button id="addCaseBtn" type="button">+ 添加</button>
+            </div>
+            <div class="field" style="grid-column: span 5;">
+              <label>Gold Answer / 评分参考</label>
+              <input id="cf-gold" type="text" placeholder="正确答案要点" value="应提到 PPE、通风、加酸入水、废液分类、酸性容器标签和引用来源" />
+            </div>
+          </form>
+
+          <div class="case-pool" id="casePool">
+            <span style="color: var(--muted);">还没有用例，点击「+ 添加」或下面的「载入示例」开始。</span>
+          </div>
+
+          <div class="run-action">
+            <button class="btn" type="button" id="loadSampleBtn">载入示例 case</button>
+            <button class="btn" type="button" id="clearPoolBtn">清空池</button>
+          </div>
+        </section>
+
         <section class="experiment-switch">
           <button class="variant active" type="button" data-variant="promptB">
-            <span>推荐版本</span>
+            <span>候选版本 · 推荐</span>
             <strong>Prompt B + RAG Top-5</strong>
           </button>
           <button class="variant" type="button" data-variant="promptA">
@@ -52,31 +116,31 @@
             <strong>Prompt A + RAG Top-3</strong>
           </button>
           <button class="variant" type="button" data-variant="modelC">
-            <span>候选版本</span>
+            <span>大模型候选</span>
             <strong>Model C + Judge v2</strong>
           </button>
         </section>
 
         <section class="score-grid">
           <article class="score-card">
-            <span>准确率</span>
-            <strong id="accuracy">88%</strong>
-            <p id="accuracyDelta">+6.2% vs baseline</p>
+            <span>核心准确率</span>
+            <strong id="accuracy">—</strong>
+            <p id="accuracyDelta">等待评测</p>
           </article>
           <article class="score-card">
             <span>幻觉率</span>
-            <strong id="hallucination">2.7%</strong>
-            <p id="hallucinationDelta">达标</p>
+            <strong id="hallucination">—</strong>
+            <p id="hallucinationDelta">等待评测</p>
           </article>
           <article class="score-card">
             <span>P95 延迟</span>
-            <strong id="latency">6.8s</strong>
-            <p id="latencyDelta">低于门禁 8s</p>
+            <strong id="latency">—</strong>
+            <p id="latencyDelta">等待评测</p>
           </article>
           <article class="score-card">
             <span>单次成本</span>
-            <strong id="cost">$0.014</strong>
-            <p id="costDelta">+9% cost</p>
+            <strong id="cost">—</strong>
+            <p id="costDelta">等待评测</p>
           </article>
         </section>
 
@@ -84,9 +148,11 @@
           <article class="panel">
             <div class="panel-head">
               <h2>上线门禁</h2>
-              <span id="gateStatus" class="gate pass">允许灰度</span>
+              <span id="gateStatus" class="gate warn">等待运行</span>
             </div>
-            <div id="gateList" class="gate-list"></div>
+            <div id="gateList" class="gate-list">
+              <div class="empty">点击「运行评测」后由 AI Judge 给出门禁判断。</div>
+            </div>
           </article>
 
           <article class="panel">
@@ -94,25 +160,23 @@
               <h2>失败归因</h2>
               <span>Top 5</span>
             </div>
-            <div id="failureList" class="failure-list"></div>
+            <div id="failureList" class="failure-list">
+              <div class="empty">尚未运行评测。</div>
+            </div>
           </article>
 
           <article class="panel wide">
             <div class="panel-head">
               <h2>样例评测结果</h2>
-              <span>LLM-as-Judge + 人工抽检</span>
+              <span>LLM-as-Judge · 实时</span>
             </div>
             <table>
               <thead>
-                <tr>
-                  <th>Case</th>
-                  <th>场景</th>
-                  <th>风险</th>
-                  <th>结果</th>
-                  <th>失败标签</th>
-                </tr>
+                <tr><th>Case</th><th>场景</th><th>风险</th><th>结果</th><th>失败标签</th><th>说明</th></tr>
               </thead>
-              <tbody id="caseTable"></tbody>
+              <tbody id="caseTable">
+                <tr><td colspan="6"><div class="empty">运行评测后将显示每个 case 的判定与四维评分。</div></td></tr>
+              </tbody>
             </table>
           </article>
         </section>
