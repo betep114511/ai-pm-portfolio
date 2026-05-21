@@ -7,3 +7,11 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# never re-add private notes — they live as a sibling of this repo at
+# ../ai-pm-portfolio-private/
+_private/
+interview_guide_ai_pm.md
+portfolio_presentation_guide.md
+projects_for_resume.md
+resume_snippets.md
