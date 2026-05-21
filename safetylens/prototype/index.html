@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SafetyLens Prototype</title>
+    <title>SafetyLens · SDS 安全审核</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -13,69 +16,98 @@
           <div class="mark">S</div>
           <div>
             <strong>SafetyLens</strong>
-            <span>SDS 安全审核</span>
+            <span>SDS 安全合规审核</span>
           </div>
         </div>
+
+        <span class="health-pill" id="healthPill">
+          <span class="dot"></span>
+          <span id="healthLabel">检测中…</span>
+        </span>
+
         <nav class="nav">
           <button class="active" type="button">审核工作台</button>
           <button type="button">化学品库</button>
           <button type="button">规则库</button>
           <button type="button">审计记录</button>
         </nav>
+
         <section class="upload-panel">
-          <div class="label">当前批次</div>
+          <span class="label">当前批次</span>
           <h2>新入库化学品审核</h2>
-          <p>12 份 SDS · 4 项高风险待确认</p>
-          <button type="button">上传 SDS</button>
+          <p>12 SDS · 4 high-risk</p>
+          <button type="button">+ 上传新 SDS</button>
         </section>
-        <section class="chem-list">
-          <div class="label">样例 SDS</div>
-          <button class="chem active" type="button" data-chemical="ether"><span class="risk high">高</span>乙醚</button>
-          <button class="chem" type="button" data-chemical="acid"><span class="risk high">高</span>浓硫酸</button>
-          <button class="chem" type="button" data-chemical="dmf"><span class="risk medium">中</span>DMF</button>
-          <button class="chem" type="button" data-chemical="nah"><span class="risk high">高</span>氢化钠</button>
+
+        <section class="chem-list-card">
+          <span class="label">样例 SDS</span>
+          <div class="chem-list">
+            <button class="chem active" type="button" data-chemical="ether"><span class="risk high">高</span>乙醚</button>
+            <button class="chem" type="button" data-chemical="acid"><span class="risk high">高</span>浓硫酸</button>
+            <button class="chem" type="button" data-chemical="dmf"><span class="risk medium">中</span>DMF</button>
+            <button class="chem" type="button" data-chemical="nah"><span class="risk high">高</span>氢化钠</button>
+          </div>
         </section>
       </aside>
 
       <main class="main">
         <header class="topbar">
           <div>
-            <h1 id="chemicalName">乙醚 SDS 审核</h1>
-            <p id="chemicalMeta">CAS 60-29-7 · 高度易燃 · 待 EHS 确认</p>
+            <div class="breadcrumb">prototype / safetylens / review-bench</div>
+            <h1 id="chemicalName">SDS 安全合规审核</h1>
+            <p class="meta-line" id="chemicalMeta">粘贴任意化学品 SDS 段落，AI 完成字段抽取 + 规则校验</p>
           </div>
           <div class="actions">
-            <button class="secondary" type="button">导出清单</button>
-            <button id="analyzeButton" class="secondary" type="button">AI 重新分析</button>
-            <button id="approveButton" class="primary" type="button">确认高风险项</button>
+            <button class="btn" type="button" id="exportBtn">导出清单</button>
+            <button class="btn primary" type="button" id="analyzeButton">AI 分析 →</button>
           </div>
         </header>
 
+        <div class="runtime-meta">
+          <span>backend <strong id="rtBackend">checking…</strong></span>
+          <span>model <strong id="rtModel">—</strong></span>
+          <span>latency <strong id="rtLatency">—</strong></span>
+          <span>mode <strong id="rtMode">demo</strong></span>
+        </div>
+
+        <section class="composer">
+          <div class="composer-grid">
+            <div class="field">
+              <label for="chemInput">化学品名称 / CAS <span class="hint">任意输入</span></label>
+              <input id="chemInput" type="text" placeholder="例如：四氢呋喃 / 109-99-9" value="乙醚 (CAS 60-29-7)" />
+              <div style="margin-top: 12px;">
+                <label for="rulesInput">附加规则 <span class="hint">可选，逗号分隔</span></label>
+                <input id="rulesInput" type="text" placeholder="例如：远离氧化剂, 必须 EHS 二审" value="" />
+              </div>
+              <div class="preset-row" style="margin-top: 14px;" id="presetRow">
+                <button class="preset active" type="button" data-chemical="ether">乙醚</button>
+                <button class="preset" type="button" data-chemical="acid">浓硫酸</button>
+                <button class="preset" type="button" data-chemical="dmf">DMF</button>
+                <button class="preset" type="button" data-chemical="nah">氢化钠</button>
+                <button class="preset" type="button" data-chemical="thf">THF 自定义</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="sdsInput">SDS 原文片段 <span class="hint">支持中英文，AI 基于该段落抽取</span></label>
+              <textarea id="sdsInput" rows="9" placeholder="粘贴 SDS Section 2 / 7 / 8 / 10 原文…">Highly flammable liquid and vapor. Keep away from heat, sparks, open flames. Store in a well-ventilated place. Incompatible with oxidizing agents. Use appropriate personal protective equipment including safety goggles and chemical-resistant gloves.</textarea>
+            </div>
+          </div>
+        </section>
+
         <section class="status-strip">
-          <div>
-            <span>字段抽取</span>
-            <strong id="extractScore">94%</strong>
-          </div>
-          <div>
-            <span>高风险召回</span>
-            <strong>100%</strong>
-          </div>
-          <div>
-            <span>规则冲突</span>
-            <strong id="conflictCount">2</strong>
-          </div>
-          <div>
-            <span>审核状态</span>
-            <strong id="reviewStatus">待确认</strong>
-          </div>
+          <div class="status-card risk-ok"><span>字段抽取</span><strong id="extractScore">—</strong></div>
+          <div class="status-card risk-high"><span>高风险召回</span><strong>100%</strong></div>
+          <div class="status-card risk-high"><span>规则冲突</span><strong id="conflictCount">—</strong></div>
+          <div class="status-card"><span>审核状态</span><strong id="reviewStatus" style="font-size: 14px;">待 AI 分析</strong></div>
         </section>
 
         <section class="grid">
           <article class="card document-card">
             <div class="card-head">
               <h2>SDS 片段</h2>
-              <span id="docSource">Section 2 / Section 7</span>
+              <span id="docSource">user input</span>
             </div>
-            <p id="sdsText">Highly flammable liquid and vapor. Keep away from heat, sparks, open flames. Store in a well-ventilated place. Incompatible with oxidizing agents.</p>
+            <div id="sdsText">点击「AI 分析」开始。粘贴的 SDS 原文将作为唯一证据源。</div>
           </article>
 
           <article class="card">
@@ -83,7 +115,12 @@
               <h2>AI 抽取字段</h2>
               <span>LLM Draft</span>
             </div>
-            <div id="fieldList" class="field-list"></div>
+            <div id="fieldList" class="field-list">
+              <div class="field-item"><span class="f-name">CAS</span><span class="f-val">—</span><span class="f-score">—</span></div>
+              <div class="field-item"><span class="f-name">危险类别</span><span class="f-val">—</span><span class="f-score">—</span></div>
+              <div class="field-item"><span class="f-name">PPE</span><span class="f-val">—</span><span class="f-score">—</span></div>
+              <div class="field-item"><span class="f-name">储存</span><span class="f-val">—</span><span class="f-score">—</span></div>
+            </div>
           </article>
 
           <article class="card">
@@ -103,10 +140,10 @@
           </article>
         </section>
 
-        <section class="audit card">
+        <section class="card audit">
           <div class="card-head">
             <h2>审计留痕</h2>
-            <span>AI 输出和人工修改均保留</span>
+            <span>AI 输出 + 人工修改均保留</span>
           </div>
           <div id="auditLog" class="timeline"></div>
         </section>

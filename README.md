@@ -103,17 +103,39 @@
 
 ## 本地 AI 调用
 
-公开的 GitHub Pages 版本默认使用内置 mock 数据，便于面试展示。若要接入真实模型，请在本地启动后端代理，API key 只放在本地环境变量里，不要写入前端代码或提交到 GitHub。
+GitHub Pages 公开版默认使用兜底 mock 数据，便于面试稳定展示。本地启动后端后，**所有 4 个原型 + 主页 AI 助手都会切换到真实 LLM**：
+
+- 主页右上角「问问作品集」是流式 SSE 助手，可以让面试官用自然语言询问候选人背景、项目细节、指标定义。
+- ChemDoc AI 支持粘贴任意 SOP/SDS/论文片段作为知识源，模型只在用户提供的 snippet 内回答并附引用。
+- SafetyLens 支持粘贴任意化学品名 + SDS 段落 + 附加规则，AI 完成字段抽取 + 规则校验。
+- EvalOps Lite 支持自由添加 case（Q/A/Gold/Risk），调用 LLM-as-Judge 批量打分。
+- InterviewMate AI 支持粘贴任意 JD，多轮对话保留上下文，AI 流式追问 + 四维评分。
+
+启动方式：
 
 ```bash
 cd /mlx_devbox/users/xingtianshun/playground/ai-pm-portfolio
-export AI_API_KEY="your_local_key_here"
+export AI_API_KEY="your_local_key_here"       # 只放本地环境变量
 export AI_BASE_URL="https://super-relay.byted.org/v1"
 export AI_MODEL="ark/k2"
 ./scripts/run_ai_backend.sh
+# 本地后端会监听 http://127.0.0.1:8787
 ```
 
-后端启动后，四个原型会优先请求 `http://127.0.0.1:8787`；如果本地后端不可用，会自动回到 mock 数据。
+后端启动后，所有原型左上角的健康胶囊会从「离线 · mock」变成「实时 LLM」，每个页面顶部的 runtime metadata bar 会显示 `backend / model / latency` 的实时状态。后端不可用时自动回到兜底数据，UI 不会崩。
+
+### 后端 API 一览
+
+| 端点 | 类型 | 用途 |
+| --- | --- | --- |
+| `GET /health` | JSON | 健康检查 + 模型与 base_url 信息 |
+| `POST /api/chemdoc/ask` | JSON | ChemDoc — 基于用户 snippet 的引用式回答 |
+| `POST /api/safetylens/analyze` | JSON | SafetyLens — SDS 字段抽取 + 规则校验 |
+| `POST /api/evalops/judge` | JSON | EvalOps — 批量 LLM-as-Judge 评分 |
+| `POST /api/interviewmate/coach` | JSON | InterviewMate — 评分 + 反馈 + 训练计划 |
+| `POST /api/interviewmate/chat/stream` | SSE | InterviewMate — 流式多轮追问 |
+| `POST /api/portfolio/ask/stream` | SSE | 主页 AI 助手 — 流式问答 |
+| `POST /api/chat/stream` | SSE | 通用流式 chat（自定义 system + history） |
 
 安全提醒：
 
