@@ -108,6 +108,10 @@ const confidenceValue = document.querySelector("#confidenceValue");
 const citationList = document.querySelector("#citationList");
 const retrievalMeta = document.querySelector("#retrievalMeta");
 const feedbackStatus = document.querySelector("#feedbackStatus");
+const navItems = Array.from(document.querySelectorAll(".nav-item"));
+const docList = document.querySelector(".doc-list");
+const uploadButton = document.querySelector(".icon-button");
+const exportButton = document.querySelector(".outline-button");
 const chips = Array.from(document.querySelectorAll(".chip"));
 const feedbackButtons = Array.from(document.querySelectorAll(".feedback-button"));
 
@@ -128,6 +132,30 @@ async function postWithTimeout(url, payload, timeoutMs = 30000) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function showToast(message) {
+  const existing = document.querySelector(".demo-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "demo-toast";
+  toast.textContent = message;
+  toast.setAttribute("role", "status");
+  toast.style.cssText = "position:fixed;right:18px;bottom:18px;z-index:20;max-width:320px;padding:12px 14px;border-radius:8px;background:#132027;color:#fff;box-shadow:0 14px 36px rgba(0,0,0,.18);font-size:14px;line-height:1.45;";
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 2600);
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function fallbackAnswer(question) {
@@ -182,6 +210,53 @@ async function askLocalAI(question) {
   });
 }
 
+navItems.forEach((button) => {
+  button.addEventListener("click", () => {
+    navItems.forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    const label = button.textContent.trim();
+    feedbackStatus.textContent = `已切换到「${label}」视图，当前演示仍保留问答工作台核心流程。`;
+    showToast(`已切换到 ${label}`);
+  });
+});
+
+function bindDocRows() {
+  document.querySelectorAll(".doc-row").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".doc-row").forEach((item) => item.classList.remove("selected"));
+      button.classList.add("selected");
+      const label = button.innerText.replace(/\s+/g, " ").trim();
+      retrievalMeta.textContent = `当前选中文档：${label}`;
+      feedbackStatus.textContent = `已选择引用文档：${label}`;
+    });
+  });
+}
+
+uploadButton.addEventListener("click", () => {
+  const created = document.createElement("button");
+  created.className = "doc-row selected";
+  created.type = "button";
+  created.innerHTML = '<span class="doc-type sop">SOP</span><span>新上传实验 SOP</span>';
+  document.querySelectorAll(".doc-row").forEach((item) => item.classList.remove("selected"));
+  docList.appendChild(created);
+  bindDocRows();
+  retrievalMeta.textContent = "当前选中文档：SOP 新上传实验 SOP";
+  feedbackStatus.textContent = "已模拟上传 1 份 SOP，并加入最近引用列表。";
+  showToast("已模拟上传 SOP 文档");
+});
+
+exportButton.addEventListener("click", () => {
+  downloadJson("chemdoc_qa_record.json", {
+    question: questionInput.value.trim(),
+    answer: answerTitle.textContent,
+    risk: riskBadge.textContent,
+    confidence: confidenceValue.textContent,
+    retrieval: retrievalMeta.textContent,
+    exported_at: new Date().toISOString()
+  });
+  feedbackStatus.textContent = "已导出当前问答记录。";
+});
+
 chips.forEach((chip) => {
   chip.addEventListener("click", () => {
     chips.forEach((item) => item.classList.remove("active"));
@@ -235,4 +310,5 @@ feedbackButtons.forEach((button) => {
   });
 });
 
+bindDocRows();
 renderAnswer(questionInput.value.trim());

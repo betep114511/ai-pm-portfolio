@@ -98,6 +98,9 @@ const variants = {
 };
 
 const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
+const navButtons = Array.from(document.querySelectorAll("aside nav button"));
+const importButton = document.querySelector(".dataset button");
+const exportButton = document.querySelector(".actions .secondary");
 
 const el = {
   accuracy: document.querySelector("#accuracy"),
@@ -131,6 +134,30 @@ async function postWithTimeout(url, payload, timeoutMs = 30000) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function showToast(message) {
+  const existing = document.querySelector(".demo-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "demo-toast";
+  toast.textContent = message;
+  toast.setAttribute("role", "status");
+  toast.style.cssText = "position:fixed;right:18px;bottom:18px;z-index:20;max-width:320px;padding:12px 14px;border-radius:8px;background:#17233a;color:#fff;box-shadow:0 14px 36px rgba(0,0,0,.18);font-size:14px;line-height:1.45;";
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 2600);
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function escapeHtml(value) {
@@ -177,6 +204,47 @@ async function judgeSampleWithLocalAI() {
       risk_level: "medium"
   });
 }
+
+navButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    navButtons.forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    const label = button.textContent.trim();
+    el.gateStatus.textContent = label;
+    el.gateStatus.className = "gate pass";
+    showToast(`已切换到 ${label}`);
+  });
+});
+
+importButton.addEventListener("click", () => {
+  el.caseTable.insertAdjacentHTML("afterbegin", `
+    <tr>
+      <td>REG-018</td>
+      <td>线上失败回流</td>
+      <td>高</td>
+      <td><span class="tag warn">待复测</span></td>
+      <td>regression_sample</td>
+    </tr>
+  `);
+  el.gateStatus.textContent = "已导入回归样本";
+  el.gateStatus.className = "gate fail";
+  showToast("已导入 1 条线上失败样本");
+});
+
+exportButton.addEventListener("click", () => {
+  downloadJson("evalops_report.json", {
+    accuracy: el.accuracy.textContent,
+    hallucination: el.hallucination.textContent,
+    latency: el.latency.textContent,
+    cost: el.cost.textContent,
+    gate: el.gateStatus.textContent,
+    cases: Array.from(el.caseTable.querySelectorAll("tr")).map((row) =>
+      Array.from(row.querySelectorAll("td")).map((cell) => cell.textContent.trim())
+    ),
+    exported_at: new Date().toISOString()
+  });
+  showToast("已导出评测报告");
+});
 
 document.querySelectorAll(".variant").forEach((button) => {
   button.addEventListener("click", () => {

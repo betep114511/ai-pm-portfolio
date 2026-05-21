@@ -90,6 +90,9 @@ const chemicals = {
 
 const AI_BACKEND_URL = localStorage.getItem("AI_BACKEND_URL") || "http://127.0.0.1:8787";
 let currentChemicalKey = "ether";
+const navButtons = Array.from(document.querySelectorAll(".nav button"));
+const uploadButton = document.querySelector(".upload-panel button");
+const exportButton = document.querySelector(".actions .secondary");
 
 const fields = {
   chemicalName: document.querySelector("#chemicalName"),
@@ -122,6 +125,30 @@ async function postWithTimeout(url, payload, timeoutMs = 30000) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function showToast(message) {
+  const existing = document.querySelector(".demo-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "demo-toast";
+  toast.textContent = message;
+  toast.setAttribute("role", "status");
+  toast.style.cssText = "position:fixed;right:18px;bottom:18px;z-index:20;max-width:320px;padding:12px 14px;border-radius:8px;background:#10231b;color:#fff;box-shadow:0 14px 36px rgba(0,0,0,.18);font-size:14px;line-height:1.45;";
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 2600);
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function escapeHtml(value) {
@@ -168,6 +195,41 @@ async function analyzeWithLocalAI(item) {
       sds_text: item.text
   });
 }
+
+navButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    navButtons.forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    const label = button.textContent.trim();
+    fields.reviewStatus.textContent = label;
+    fields.auditLog.insertAdjacentHTML("beforeend", `
+      <div class="event"><time>View</time><p>已切换到 ${escapeHtml(label)} 视图。</p></div>
+    `);
+    showToast(`已切换到 ${label}`);
+  });
+});
+
+uploadButton.addEventListener("click", () => {
+  fields.reviewStatus.textContent = "新 SDS 待审核";
+  fields.auditLog.insertAdjacentHTML("beforeend", `
+    <div class="event"><time>Upload</time><p>已模拟上传 1 份 SDS，进入 AI 抽取队列。</p></div>
+  `);
+  showToast("已模拟上传 SDS");
+});
+
+exportButton.addEventListener("click", () => {
+  downloadJson("safetylens_checklist.json", {
+    chemical: fields.chemicalName.textContent,
+    meta: fields.chemicalMeta.textContent,
+    status: fields.reviewStatus.textContent,
+    conflicts: fields.conflictCount.textContent,
+    checklist: Array.from(fields.checklist.querySelectorAll("li")).map((item) => item.textContent),
+    exported_at: new Date().toISOString()
+  });
+  fields.auditLog.insertAdjacentHTML("beforeend", `
+    <div class="event"><time>Export</time><p>已导出当前安全清单。</p></div>
+  `);
+});
 
 document.querySelectorAll(".chem").forEach((button) => {
   button.addEventListener("click", () => {
